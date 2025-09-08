@@ -1,0 +1,59 @@
+# Module
+Module104000Name=Revenue Sharing
+Module104000Desc=Gestion du partage de revenus avec les collaborateurs
+
+# Permissions
+Permission104000=Lire les données de partage de revenus
+Permission104001=Créer/modifier les contrats de partage
+Permission104002=Supprimer les contrats de partage
+
+# Menu
+RevenueSharing=Partage Revenus
+Dashboard=Tableau de bord
+Collaborators=Collaborateurs
+Contracts=Contrats
+Expenses=Dépenses
+Reports=Rapports
+
+# General
+Collaborator=Collaborateur
+Contract=Contrat
+Revenue=Revenu
+Percentage=Pourcentage
+Amount=Montant
+Status=Statut
+Active=Actif
+Inactive=Inactif
+
+# Collaborators
+CollaboratorsList=Liste des collaborateurs
+NewCollaborator=Nouveau collaborateur
+DefaultPercentage=Pourcentage par défaut
+CostPerSession=Coût par séance
+TotalRevenue=Chiffre d'affaires total
+CollaboratorShare=Part collaborateur
+
+# Contracts
+ContractsList=Liste des contrats
+NewContract=Nouveau contrat
+CollaboratorAmount=Montant collaborateur
+StudioAmount=Montant studio
+NetAmount=Montant net
+Sessions=Séances
+Costs=Coûts
+
+# Dashboard
+MonthlyRevenue=Revenus mensuels
+TopCollaborators=Top collaborateurs
+AverageRevenue=Revenu moyen
+
+# Configuration
+Setup=Configuration
+AutoCreateContract=Création automatique des contrats
+ImportExcelData=Importer données Excel
+ImportExcel=Import Excel
+
+# Messages
+RevenueContractCreated=Contrat de partage créé automatiquement
+ErrorCreatingRevenueContract=Erreur lors de la création du contrat
+SetupSaved=Configuration sauvegardée
