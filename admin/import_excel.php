@@ -19,7 +19,7 @@ $action = GETPOST('action', 'alpha');
 llxHeader('', 'Import Excel - Revenue Sharing', '');
 
 $linkback = '<a href="setup.php">← Retour à la configuration</a>';
-print load_fiche_titre('📥 Import des données Excel', $linkback, 'generic');
+print load_fiche_titre('Import des données Excel', $linkback, 'generic');
 
 // Traitement de l'import
 if ($action == 'import') {
@@ -35,7 +35,7 @@ if ($action == 'import') {
         if (move_uploaded_file($_FILES['importfile']['tmp_name'], $filename)) {
 
             print '<div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; padding: 15px; margin: 15px 0;">';
-            print '<h3 style="margin: 0; color: #155724;">📁 Fichier uploadé avec succès</h3>';
+            print '<h3 style="margin: 0; color: #155724;">Fichier uploadé avec succès</h3>';
             print '<p>Fichier : '.basename($filename).'</p>';
             print '<p>Taille : '.number_format(filesize($filename)).' octets</p>';
             print '</div>';
@@ -62,7 +62,7 @@ if ($action == 'import') {
                             if ($line_number == 1) {
                                 // En-têtes
                                 $headers = $data;
-                                print '<h4>📋 Structure détectée :</h4>';
+                                print '<h4>Structure détectée :</h4>';
                                 print '<ul>';
                                 foreach ($headers as $i => $header) {
                                     print '<li>Colonne '.($i+1).' : <strong>'.htmlspecialchars($header).'</strong></li>';
@@ -87,7 +87,7 @@ if ($action == 'import') {
 
                             if ($line_number > 10) {
                                 print '<div style="color: orange; padding: 10px; background: #fff3cd; border-radius: 3px; margin: 10px 0;">';
-                                print '⚠️ Affichage limité aux 10 premières lignes pour la démonstration.';
+                                print 'Affichage limité aux 10 premières lignes pour la démonstration.';
                                 print '</div>';
                                 break;
                             }
@@ -96,21 +96,21 @@ if ($action == 'import') {
                         fclose($handle);
 
                         print '<div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; padding: 15px; margin: 15px 0;">';
-                        print '<h3 style="margin: 0; color: #155724;">✅ Analyse terminée</h3>';
+                        print '<h3 style="margin: 0; color: #155724;">Analyse terminée</h3>';
                         print '<p><strong>'.$imported.' lignes</strong> ont été analysées avec succès.</p>';
                         print '<p><em>Note : Ceci est une démonstration. L\'import réel nécessiterait une validation et insertion en base.</em></p>';
                         print '</div>';
 
                     } else {
                         print '<div style="color: red; padding: 15px; background: #f8d7da; border-radius: 5px;">';
-                        print '❌ Impossible de lire le fichier CSV.';
+                        print 'Impossible de lire le fichier CSV.';
                         print '</div>';
                     }
 
                 } elseif (in_array($extension, ['xlsx', 'xls'])) {
 
                     print '<div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 15px 0;">';
-                    print '<h3 style="margin: 0; color: #856404;">📊 Fichier Excel détecté</h3>';
+                    print '<h3 style="margin: 0; color: #856404;">Fichier Excel détecté</h3>';
                     print '<p>Pour traiter les fichiers Excel (.xlsx/.xls), il faut installer la bibliothèque PhpSpreadsheet.</p>';
                     print '<p><strong>Alternative :</strong> Convertissez votre fichier Excel en CSV depuis Excel :</p>';
                     print '<ol>';
@@ -123,13 +123,13 @@ if ($action == 'import') {
 
                 } else {
                     print '<div style="color: red; padding: 15px; background: #f8d7da; border-radius: 5px;">';
-                    print '❌ Format de fichier non supporté : .'.$extension;
+                    print 'Format de fichier non supporté : .'.$extension;
                     print '</div>';
                 }
 
             } catch (Exception $e) {
                 print '<div style="color: red; padding: 15px; background: #f8d7da; border-radius: 5px;">';
-                print '❌ Erreur lors de l\'analyse : '.htmlspecialchars($e->getMessage());
+                print 'Erreur lors de l\'analyse : '.htmlspecialchars($e->getMessage());
                 print '</div>';
             }
 
@@ -138,7 +138,7 @@ if ($action == 'import') {
 
         } else {
             print '<div style="color: red; padding: 15px; background: #f8d7da; border-radius: 5px;">';
-            print '❌ Erreur lors de l\'upload du fichier.';
+            print 'Erreur lors de l\'upload du fichier.';
             print '</div>';
         }
 
@@ -162,7 +162,7 @@ if ($action == 'import') {
         }
 
         print '<div style="color: red; padding: 15px; background: #f8d7da; border-radius: 5px;">';
-        print '❌ '.$error_message;
+        print ''.$error_message;
         print '</div>';
     }
 }
@@ -171,7 +171,7 @@ if ($action == 'import') {
 print '<div class="fichecenter">';
 
 print '<div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 5px; padding: 15px; margin: 15px 0;">';
-print '<h3 style="margin: 0 0 10px 0; color: #1565c0;">ℹ️ Information</h3>';
+print '<h3 style="margin: 0 0 10px 0; color: #1565c0;">Information</h3>';
 print '<p>Cette page permet d\'importer vos données depuis un fichier Excel ou CSV.</p>';
 print '<p><strong>Formats supportés :</strong> CSV (recommandé), TXT avec séparateur point-virgule</p>';
 print '</div>';
@@ -183,7 +183,7 @@ print '<input type="hidden" name="action" value="import">';
 print '<table class="border centpercent">';
 
 print '<tr class="liste_titre">';
-print '<th colspan="2">📁 Sélection du fichier</th>';
+print '<th colspan="2">Sélection du fichier</th>';
 print '</tr>';
 
 print '<tr>';
@@ -196,7 +196,7 @@ print '</tr>';
 
 print '<tr>';
 print '<td colspan="2" class="center" style="padding: 20px;">';
-print '<input type="submit" class="button" value="📤 Analyser le fichier" style="font-size: 16px; padding: 10px 20px;">';
+print '<input type="submit" class="button" value="Analyser le fichier" style="font-size: 16px; padding: 10px 20px;">';
 print '</td>';
 print '</tr>';
 
@@ -208,9 +208,9 @@ print '</div>';
 // Instructions détaillées
 print '<br>';
 print '<div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px;">';
-print '<h3>📋 Instructions d\'import</h3>';
+print '<h3>Instructions d\'import</h3>';
 
-print '<h4>📊 Structure attendue du fichier :</h4>';
+print '<h4>Structure attendue du fichier :</h4>';
 print '<table class="noborder" style="font-size: 14px;">';
 print '<tr class="liste_titre">';
 print '<th>Colonne</th>';
@@ -240,7 +240,7 @@ foreach ($structure as $row) {
 
 print '</table>';
 
-print '<h4>💡 Conseils :</h4>';
+print '<h4>Conseils :</h4>';
 print '<ul>';
 print '<li><strong>Première ligne :</strong> Doit contenir les en-têtes de colonnes</li>';
 print '<li><strong>Séparateur CSV :</strong> Point-virgule (;) de préférence</li>';
@@ -249,7 +249,7 @@ print '<li><strong>Encodage :</strong> UTF-8 recommandé</li>';
 print '<li><strong>Test :</strong> Commencez par un petit fichier de test</li>';
 print '</ul>';
 
-print '<h4>🔧 Conversion Excel vers CSV :</h4>';
+print '<h4>Conversion Excel vers CSV :</h4>';
 print '<ol>';
 print '<li>Ouvrir votre fichier Excel</li>';
 print '<li>Fichier > Enregistrer sous</li>';
@@ -262,23 +262,23 @@ print '</div>';
 // Informations techniques
 print '<br>';
 print '<div style="background: #f1f3f4; border: 1px solid #dadce0; border-radius: 5px; padding: 15px;">';
-print '<h4>🔧 Informations techniques</h4>';
+print '<h4>Informations techniques</h4>';
 print '<table class="noborder">';
 print '<tr><td><strong>Taille max :</strong></td><td>'.ini_get('upload_max_filesize').'</td></tr>';
 print '<tr><td><strong>Mémoire PHP :</strong></td><td>'.ini_get('memory_limit').'</td></tr>';
 print '<tr><td><strong>Répertoire temp :</strong></td><td>'.DOL_DATA_ROOT.'/revenuesharing/temp</td></tr>';
 print '<tr><td><strong>Extensions PHP :</strong></td><td>';
-if (extension_loaded('zip')) print '✅ ZIP '; else print '❌ ZIP ';
-if (extension_loaded('xml')) print '✅ XML '; else print '❌ XML ';
-if (function_exists('fgetcsv')) print '✅ CSV '; else print '❌ CSV ';
+if (extension_loaded('zip')) print 'ZIP '; else print 'ZIP ';
+if (extension_loaded('xml')) print 'XML '; else print 'XML ';
+if (function_exists('fgetcsv')) print 'CSV '; else print 'CSV ';
 print '</td></tr>';
 print '</table>';
 print '</div>';
 
 print '<br>';
 print '<div class="tabsAction">';
-print '<a href="setup.php" class="butAction">⚙️ Retour à la configuration</a>';
-print '<a href="../index.php" class="butAction">🏠 Dashboard</a>';
+print '<a href="setup.php" class="butAction">Retour à la configuration</a>';
+print '<a href="../index.php" class="butAction">Dashboard</a>';
 print '</div>';
 
 llxFooter();

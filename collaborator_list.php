@@ -1,7 +1,6 @@
 <?php
-// Chemin corrigé pour votre installation
-$dolibarr_main_document_root = '/home/ohmnibus/dolibarr/htdocs';
-require_once $dolibarr_main_document_root.'/main.inc.php';
+// Utilisation de la méthode standard Dolibarr pour l'inclusion
+require_once '../../main.inc.php';
 
 // Load translation files
 $langs->load("revenuesharing@revenuesharing");
@@ -50,7 +49,7 @@ if (!$sortorder) $sortorder = "ASC";
 
 llxHeader('', 'Liste des Collaborateurs', '');
 
-print load_fiche_titre('👥 Liste des Collaborateurs', '', 'generic');
+print load_fiche_titre('Liste des Collaborateurs', '', 'generic');
 
 // Actions
 if ($action == 'delete' && $can_delete) {
@@ -71,8 +70,8 @@ print '<form method="GET" action="'.$_SERVER["PHP_SELF"].'">';
 print '<div class="fichecenter">';
 print '<table class="noborder nohover centpercent">';
 print '<tr class="liste_titre">';
-print '<th class="liste_titre">🔍 Recherche</th>';
-print '<th class="liste_titre">📊 Statut</th>';
+print '<th class="liste_titre">Recherche</th>';
+print '<th class="liste_titre">Statut</th>';
 print '<th class="liste_titre">&nbsp;</th>';
 print '</tr>';
 
@@ -92,12 +91,7 @@ print '</table>';
 print '</div>';
 print '</form>';
 
-// Bouton Nouveau
-if ($can_write) {
-    print '<div class="tabsAction">';
-    print '<a class="butAction" href="collaborator_card.php?action=create">➕ Nouveau Collaborateur</a>';
-    print '</div>';
-}
+// Bouton Nouveau - Supprimé car fonction disponible directement dans la liste
 
 // Liste des collaborateurs
 $sql = "SELECT c.rowid, c.label, c.default_percentage, c.active, c.date_creation,";
@@ -127,14 +121,14 @@ if ($resql) {
     print '<div class="div-table-responsive">';
     print '<table class="noborder centpercent">';
     print '<tr class="liste_titre">';
-    print '<th>👤 Collaborateur</th>';
-    print '<th>🔗 Utilisateur</th>';
-    print '<th class="center">📊 % Défaut</th>';
-    print '<th class="center">📄 Contrats</th>';
-    print '<th class="center">💰 CA Total</th>';
-    print '<th class="center">📅 Créé le</th>';
-    print '<th class="center">🏷️ Statut</th>';
-    print '<th class="center">⚙️ Actions</th>';
+    print '<th> Collaborateur</th>';
+    print '<th>Utilisateur</th>';
+    print '<th class="center">% Défaut</th>';
+    print '<th class="center"> Contrats</th>';
+    print '<th class="center">CA Total</th>';
+    print '<th class="center">Créé le</th>';
+    print '<th class="center">Statut</th>';
+    print '<th class="center">Actions</th>';
     print '</tr>';
 
     if ($num > 0) {
@@ -175,27 +169,27 @@ if ($resql) {
             // Statut
             print '<td class="center">';
             if ($obj->active) {
-                print '<span class="badge badge-status4 badge-status">✅ Actif</span>';
+                print '<span class="badge badge-status4 badge-status">Actif</span>';
             } else {
-                print '<span class="badge badge-status8 badge-status">❌ Inactif</span>';
+                print '<span class="badge badge-status8 badge-status">Inactif</span>';
             }
             print '</td>';
 
             // Actions
             print '<td class="center">';
             print '<a href="collaborator_card.php?id='.$obj->rowid.'" title="Voir" style="margin: 2px;">';
-            print '👁️';
+            print img_picto('', 'eye', 'class="pictofixedwidth"');
             print '</a>';
 
             if ($can_write) {
                 print '<a href="collaborator_card.php?id='.$obj->rowid.'&action=edit" title="Modifier" style="margin: 2px;">';
-                print '✏️';
+                print img_picto('', 'edit', 'class="pictofixedwidth"');
                 print '</a>';
             }
 
             if ($can_delete) {
                 print '<a href="'.$_SERVER["PHP_SELF"].'?action=delete&id='.$obj->rowid.'" title="Supprimer" onclick="return confirm(\'Confirmer la suppression ?\')" style="margin: 2px;">';
-                print '🗑️';
+                print img_picto('', 'delete', 'class="pictofixedwidth"');
                 print '</a>';
             }
             print '</td>';
@@ -208,9 +202,7 @@ if ($resql) {
         print '<div style="padding: 20px;">';
         print '<div style="font-size: 3em;">📭</div>';
         print '<h3>Aucun collaborateur trouvé</h3>';
-        if ($can_write) {
-            print '<a href="collaborator_card.php?action=create" class="butAction">➕ Créer le premier collaborateur</a>';
-        }
+        print '<p>Utilisez les filtres et actions ci-dessus pour gérer les collaborateurs.</p>';
         print '</div>';
         print '</td></tr>';
     }
@@ -232,15 +224,16 @@ if ($resql) {
 
 } else {
     print '<div style="color: red; padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px;">';
-    print '<h3>❌ Erreur de base de données</h3>';
+    print '<h3>Erreur de base de données</h3>';
     print '<p>Erreur : '.$db->lasterror().'</p>';
     print '</div>';
 }
 
 print '<br>';
 print '<div class="tabsAction">';
-print '<a href="index.php" class="butAction">🏠 Retour au Dashboard</a>';
-print '<a href="admin/setup.php" class="butAction">⚙️ Configuration</a>';
+print '<a href="collaborator_card.php?action=create" class="butAction" style="background: #28a745; color: white;">'.img_picto('', 'add', 'class="pictofixedwidth"').' Nouveau Collaborateur</a>';
+print '<a href="index.php" class="butAction">'.img_picto('', 'back', 'class="pictofixedwidth"').' Retour au Dashboard</a>';
+print '<a href="admin/setup.php" class="butAction">'.img_picto('', 'setup', 'class="pictofixedwidth"').' Configuration</a>';
 print '</div>';
 
 llxFooter();

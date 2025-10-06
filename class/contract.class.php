@@ -1,4 +1,4 @@
-php<?php
+<?php
 /**
  * Class for Revenue Sharing Contract
  */

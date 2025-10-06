@@ -1,4 +1,4 @@
-sqlCREATE TABLE llx_revenuesharing_collaborator (
+CREATE TABLE llx_revenuesharing_collaborator (
     rowid INTEGER PRIMARY KEY AUTO_INCREMENT,
     fk_user INTEGER NOT NULL,
     label VARCHAR(255),

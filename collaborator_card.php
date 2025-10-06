@@ -2,9 +2,9 @@
 // Fichier: /htdocs/custom/revenuesharing/collaborator_card.php
 // Fiche collaborateur - consultation et édition
 
-$dolibarr_main_document_root = '/home/ohmnibus/dolibarr/htdocs';
-require_once $dolibarr_main_document_root.'/main.inc.php';
-require_once $dolibarr_main_document_root.'/core/lib/usergroups.lib.php';
+// Utilisation de la méthode standard Dolibarr pour l'inclusion
+require_once '../../main.inc.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/usergroups.lib.php';
 
 // Load translation files
 $langs->load("revenuesharing@revenuesharing");
@@ -210,11 +210,11 @@ llxHeader('', 'Fiche Collaborateur', '');
 
 // Titre selon l'action
 if ($action == 'create') {
-    print load_fiche_titre('➕ Nouveau Collaborateur', '', 'generic');
+    print load_fiche_titre(' Nouveau Collaborateur', '', 'generic');
 } elseif ($action == 'edit') {
-    print load_fiche_titre('✏️ Modifier Collaborateur : '.$object->label, '', 'generic');
+    print load_fiche_titre(' Modifier Collaborateur : '.$object->label, '', 'generic');
 } else {
-    print load_fiche_titre('👤 Collaborateur : '.$object->label, '', 'generic');
+    print load_fiche_titre(' Collaborateur : '.$object->label, '', 'generic');
 }
 
 // Mode création
@@ -369,12 +369,12 @@ else {
         // Actions
         print '<div class="tabsAction">';
         if ($can_write) {
-            print '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'&action=edit">✏️ Modifier</a>';
+            print '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'&action=edit"> Modifier</a>';
         }
         if ($can_delete) {
-            print '<a class="butActionDelete" href="collaborator_list.php?action=delete&id='.$object->id.'" onclick="return confirm(\'Confirmer la suppression ?\')">🗑️ Supprimer</a>';
+            print '<a class="butActionDelete" href="collaborator_list.php?action=delete&id='.$object->id.'" onclick="return confirm(\'Confirmer la suppression ?\')"> Supprimer</a>';
         }
-        print '<a class="butAction" href="collaborator_list.php">📋 Retour à la liste</a>';
+        print '<a class="butAction" href="collaborator_list.php">Retour à la liste</a>';
         print '</div>';
 
         print '<table class="border centpercent tableforfield">';
@@ -423,9 +423,9 @@ else {
         print '<td>Statut</td>';
         print '<td>';
         if ($object->active) {
-            print '<span class="badge badge-status4 badge-status">✅ Actif</span>';
+            print '<span class="badge badge-status4 badge-status">Actif</span>';
         } else {
-            print '<span class="badge badge-status8 badge-status">❌ Inactif</span>';
+            print '<span class="badge badge-status8 badge-status">Inactif</span>';
         }
         print '</td>';
         print '</tr>';
@@ -461,7 +461,7 @@ else {
 
         // Statistiques du collaborateur
         print '<br>';
-        print '<h3>📊 Statistiques</h3>';
+        print '<h3>Statistiques</h3>';
 
         // Récupérer les stats
         $sql_stats = "SELECT COUNT(*) as nb_contracts,
@@ -501,7 +501,7 @@ else {
         // Liste des contrats récents
         if ($stats && $stats->nb_contracts > 0) {
             print '<br>';
-            print '<h3>📄 Contrats récents</h3>';
+            print '<h3> Contrats récents</h3>';
 
             $sql_contracts = "SELECT rowid, ref, label, amount_ht, net_collaborator_amount, status, date_creation";
             $sql_contracts .= " FROM ".MAIN_DB_PREFIX."revenuesharing_contract";

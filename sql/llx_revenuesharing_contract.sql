@@ -1,4 +1,4 @@
-sqlCREATE TABLE llx_revenuesharing_contract (
+CREATE TABLE llx_revenuesharing_contract (
     rowid INTEGER PRIMARY KEY AUTO_INCREMENT,
     ref VARCHAR(30) NOT NULL,
     fk_collaborator INTEGER NOT NULL,

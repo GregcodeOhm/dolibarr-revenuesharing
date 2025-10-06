@@ -20,7 +20,7 @@ class modRevenueSharing extends DolibarrModules
         $this->db = $db;
 
         // Id du module (doit être unique)
-        $this->numero = 104000;
+        $this->numero = 105500;
 
         // Key text used to identify module
         $this->rights_class = 'revenuesharing';
@@ -31,10 +31,10 @@ class modRevenueSharing extends DolibarrModules
 
         // Module label
         $this->name = "RevenueSharing";
-        $this->description = "Gestion du partage de revenus avec les collaborateurs";
+        $this->description = "Module de partage de revenus avec les collaborateurs - Revenue Sharing";
 
         // Possible values for version
-        $this->version = '1.0.0';
+        $this->version = '1.1.0';
         $this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 
         // Name of image file used for this module
@@ -140,14 +140,15 @@ class modRevenueSharing extends DolibarrModules
         );
         $r++;
 
-        // Sous-menu Nouveau Collaborateur
+        
+        // Sous-menu Comptes Collaborateurs
         $this->menu[$r] = array(
             'fk_menu' => 'fk_mainmenu=revenuesharing,fk_leftmenu=revenuesharing_collaborators',
             'type' => 'left',
-            'titre' => 'Nouveau Collaborateur',
+            'titre' => 'Comptes',
             'mainmenu' => 'revenuesharing',
-            'leftmenu' => 'revenuesharing_collaborators_new',
-            'url' => '/custom/revenuesharing/collaborator_card.php?action=create',
+            'leftmenu' => 'revenuesharing_accounts',
+            'url' => '/custom/revenuesharing/account_list.php',
             'langs' => 'revenuesharing@revenuesharing',
             'position' => 1000 + $r,
             'enabled' => 'isModEnabled("revenuesharing")',
@@ -174,18 +175,35 @@ class modRevenueSharing extends DolibarrModules
         );
         $r++;
 
-        // Sous-menu Nouveau Contrat
+        // Sous-menu Déclarations Salaires
         $this->menu[$r] = array(
-            'fk_menu' => 'fk_mainmenu=revenuesharing,fk_leftmenu=revenuesharing_contracts',
+            'fk_menu' => 'fk_mainmenu=revenuesharing',
             'type' => 'left',
-            'titre' => 'Nouveau Contrat',
+            'titre' => 'Déclarations Salaires',
             'mainmenu' => 'revenuesharing',
-            'leftmenu' => 'revenuesharing_contracts_new',
-            'url' => '/custom/revenuesharing/contract_card.php?action=create',
+            'leftmenu' => 'revenuesharing_salaries',
+            'url' => '/custom/revenuesharing/salary_declarations_list.php',
             'langs' => 'revenuesharing@revenuesharing',
             'position' => 1000 + $r,
             'enabled' => 'isModEnabled("revenuesharing")',
-            'perms' => '1',
+            'perms' => '$user->admin',
+            'target' => '',
+            'user' => 2
+        );
+        $r++;
+
+        // Sous-menu Analytique
+        $this->menu[$r] = array(
+            'fk_menu' => 'fk_mainmenu=revenuesharing',
+            'type' => 'left',
+            'titre' => 'Analytique',
+            'mainmenu' => 'revenuesharing',
+            'leftmenu' => 'revenuesharing_analytics',
+            'url' => '/custom/revenuesharing/analytics.php',
+            'langs' => 'revenuesharing@revenuesharing',
+            'position' => 1000 + $r,
+            'enabled' => 'isModEnabled("revenuesharing")',
+            'perms' => '$user->admin',
             'target' => '',
             'user' => 2
         );
@@ -208,18 +226,18 @@ class modRevenueSharing extends DolibarrModules
         );
         $r++;
 
-        // Sous-menu Import Excel (pour les admins)
+        // Sous-menu Calculateur
         $this->menu[$r] = array(
-            'fk_menu' => 'fk_mainmenu=revenuesharing,fk_leftmenu=revenuesharing_config',
+            'fk_menu' => 'fk_mainmenu=revenuesharing',
             'type' => 'left',
-            'titre' => 'Import Excel',
+            'titre' => 'Calculateur',
             'mainmenu' => 'revenuesharing',
-            'leftmenu' => 'revenuesharing_import',
-            'url' => '/custom/revenuesharing/admin/import_excel.php',
+            'leftmenu' => 'revenuesharing_calculator',
+            'url' => '/custom/revenuesharing/calculateur.php',
             'langs' => 'revenuesharing@revenuesharing',
             'position' => 1000 + $r,
             'enabled' => 'isModEnabled("revenuesharing")',
-            'perms' => '$user->admin',
+            'perms' => '1',
             'target' => '',
             'user' => 2
         );

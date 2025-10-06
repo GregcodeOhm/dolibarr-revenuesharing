@@ -40,10 +40,10 @@ if ($action == 'create') {
 
     $resql1 = $db->query($sql1);
     if ($resql1) {
-        print '<div class="ok">✅ Table llx_revenuesharing_collaborator créée</div>';
+        print '<div class="ok">Table llx_revenuesharing_collaborator créée</div>';
         $success++;
     } else {
-        print '<div class="error">❌ Erreur création table collaborateur: '.$db->lasterror().'</div>';
+        print '<div class="error">Erreur création table collaborateur: '.$db->lasterror().'</div>';
         $errors++;
     }
 
@@ -82,10 +82,10 @@ if ($action == 'create') {
 
     $resql2 = $db->query($sql2);
     if ($resql2) {
-        print '<div class="ok">✅ Table llx_revenuesharing_contract créée</div>';
+        print '<div class="ok">Table llx_revenuesharing_contract créée</div>';
         $success++;
     } else {
-        print '<div class="error">❌ Erreur création table contrat: '.$db->lasterror().'</div>';
+        print '<div class="error">Erreur création table contrat: '.$db->lasterror().'</div>';
         $errors++;
     }
 
@@ -97,10 +97,10 @@ if ($action == 'create') {
 
     $resql3 = $db->query($sql3);
     if ($resql3) {
-        print '<div class="ok">✅ Collaborateur Tony créé par défaut</div>';
+        print '<div class="ok">Collaborateur Tony créé par défaut</div>';
         $success++;
     } else {
-        print '<div class="warning">⚠️ Collaborateur Tony déjà existant ou erreur: '.$db->lasterror().'</div>';
+        print '<div class="warning">Collaborateur Tony déjà existant ou erreur: '.$db->lasterror().'</div>';
     }
 
     if ($errors == 0) {
@@ -142,13 +142,13 @@ foreach ($tables as $table => $desc) {
 
         print '<tr class="oddeven">';
         print '<td>'.$desc.'</td>';
-        print '<td><span style="color: green;">✅ Existe</span></td>';
+        print '<td><span style="color: green;">Existe</span></td>';
         print '<td>'.$nb.'</td>';
         print '</tr>';
     } else {
         print '<tr class="oddeven">';
         print '<td>'.$desc.'</td>';
-        print '<td><span style="color: red;">❌ N\'existe pas</span></td>';
+        print '<td><span style="color: red;">N\'existe pas</span></td>';
         print '<td>-</td>';
         print '</tr>';
     }
@@ -160,7 +160,7 @@ print '</table>';
 print '<br>';
 if ($action != 'create') {
     print '<div class="tabsAction">';
-    print '<a href="'.$_SERVER['PHP_SELF'].'?action=create" class="butAction">🔧 Créer les tables manquantes</a>';
+    print '<a href="'.$_SERVER['PHP_SELF'].'?action=create" class="butAction">Créer les tables manquantes</a>';
     print '<a href="setup.php" class="butAction">← Retour à la configuration</a>';
     print '</div>';
 }

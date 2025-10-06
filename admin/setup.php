@@ -1,6 +1,6 @@
 <?php
 // Chemin corrigé pour votre installation
-$dolibarr_main_document_root = '/home/ohmnibus/dolibarr/htdocs';
+$dolibarr_main_document_root = '/homez.378/ohmnibus/dolibarr/htdocs';
 require_once $dolibarr_main_document_root.'/main.inc.php';
 require_once $dolibarr_main_document_root.'/core/lib/admin.lib.php';
 
@@ -96,9 +96,9 @@ foreach ($tables as $table) {
     $sql = "SHOW TABLES LIKE '$table'";
     $resql = $db->query($sql);
     if ($resql && $db->num_rows($resql) > 0) {
-        print "✅ $table<br>";
+        print "$table<br>";
     } else {
-        print "❌ $table (à créer)<br>";
+        print "$table (à créer)<br>";
     }
 }
 print '</td>';
@@ -109,7 +109,10 @@ print '</table>';
 print '<div class="tabsAction">';
 print '<a href="../index.php" class="butAction">Dashboard</a>';
 print '<a href="../collaborator_list.php" class="butAction">Collaborateurs</a>';
-print '<a href="import_excel.php" class="butAction">Import Excel</a>';
+print '<a href="edit_extrafields.php" class="butAction" style="background: #17a2b8; color: white;"> Éditer Extrafields</a>';
+print '<a href="sync_contracts_to_accounts.php" class="butAction" style="background: #28a745; color: white;">Sync Contrats</a>';
+print '<a href="update_contract_labels.php" class="butAction" style="background: #fd7e14; color: white;">MAJ Libellés</a>';
+print '<a href="update_account_tables_supplier.php" class="butAction" style="background: #6f42c1; color: white;">MAJ Tables</a>';
 print '</div>';
 
 llxFooter();
