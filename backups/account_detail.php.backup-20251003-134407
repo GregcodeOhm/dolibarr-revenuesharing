@@ -1,0 +1,2178 @@
+<?php
+// Fichier: account_detail.php
+// Détail du compte d'un collaborateur avec historique des transactions
+
+// Utilisation de la méthode standard Dolibarr pour l'inclusion
+require_once '../../main.inc.php';
+require_once __DIR__.'/lib/revenuesharing.lib.php';
+
+// Security check
+if (!$user->admin) {
+    accessforbidden('Seuls les administrateurs peuvent accéder à cette page');
+}
+
+// Parameters
+$id = GETPOST('id', 'int');
+$action = GETPOST('action', 'alpha');
+$filter_type = GETPOST('filter_type', 'alpha');
+$filter_year = GETPOST('filter_year', 'int') ? GETPOST('filter_year', 'int') : date('Y');
+$collaborator_filter = GETPOST('collaborator_filter', 'int') ? GETPOST('collaborator_filter', 'int') : $id;
+$show_previsionnel = GETPOST('show_previsionnel', 'alpha') === 'yes';
+
+if ($id <= 0) {
+    print '<div style="color: red;">ID collaborateur manquant</div>';
+    llxFooter();
+    $db->close();
+    exit;
+}
+
+llxHeader('', 'Compte Collaborateur', '');
+
+// Récupérer les infos du collaborateur affiché (peut être différent de l'ID d'origine)
+$displayed_collaborator_id = $collaborator_filter > 0 ? $collaborator_filter : $id;
+$sql_collab = "SELECT c.*, u.firstname, u.lastname, u.email FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator c";
+$sql_collab .= " LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = c.fk_user";
+$sql_collab .= " WHERE c.rowid = ".((int) $displayed_collaborator_id);
+
+$resql_collab = $db->query($sql_collab);
+if (!$resql_collab || $db->num_rows($resql_collab) == 0) {
+    print '<div style="color: red;">Collaborateur non trouvé</div>';
+    llxFooter();
+    $db->close();
+    exit;
+}
+
+$collaborator = $db->fetch_object($resql_collab);
+$db->free($resql_collab);
+
+print load_fiche_titre('Compte de '.($collaborator->label), '', 'accounting');
+
+// Section de filtres
+print '<div style="background: #f8f9fa; border-radius: 8px; padding: 15px; margin: 15px 0; border: 1px solid #dee2e6;">';
+print '<h4 style="margin: 0 0 15px 0; color: #495057;">Filtres et Options</h4>';
+
+print '<form method="GET" action="'.$_SERVER["PHP_SELF"].'">';
+print '<input type="hidden" name="id" value="'.$id.'">';
+
+print '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 15px; align-items: end;">';
+
+// Définir les types de transactions pour le filtre
+$type_labels = array(
+    'contract' => 'Contrats',
+    'commission' => 'Commissions', 
+    'bonus' => ' Bonus',
+    'interest' => 'Intéressements',
+    'advance' => ' Avances',
+    'fee' => 'Frais',
+    'refund' => 'Remboursements',
+    'adjustment' => 'Ajustements',
+    'salary' => 'Salaires',
+    'other_credit' => ' Autres crédits',
+    'other_debit' => ' Autres débits'
+);
+
+// Sélecteur de collaborateur
+print '<div>';
+print '<label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333;"> Collaborateur</label>';
+print '<select name="collaborator_filter" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">';
+
+$sql_all_collabs = "SELECT rowid, label FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator WHERE active = 1 ORDER BY label";
+$resql_all_collabs = $db->query($sql_all_collabs);
+if ($resql_all_collabs) {
+    while ($collab_option = $db->fetch_object($resql_all_collabs)) {
+        $selected = ($collab_option->rowid == $displayed_collaborator_id) ? ' selected' : '';
+        print '<option value="'.$collab_option->rowid.'"'.$selected.'>'.dol_escape_htmltag($collab_option->label).'</option>';
+    }
+    $db->free($resql_all_collabs);
+}
+print '</select>';
+print '</div>';
+
+// Filtre année
+print '<div>';
+print '<label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333;">Année</label>';
+print '<select name="filter_year" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">';
+print '<option value="0"'.($filter_year == 0 ? ' selected' : '').'>Toutes années</option>';
+for ($year = date('Y'); $year >= 2020; $year--) {
+    $selected = ($year == $filter_year) ? ' selected' : '';
+    print '<option value="'.$year.'"'.$selected.'>'.$year.'</option>';
+}
+print '</select>';
+print '</div>';
+
+// Filtre type de transaction
+print '<div>';
+print '<label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333;">Type transaction</label>';
+print '<select name="filter_type" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">';
+print '<option value="">Tous types</option>';
+foreach ($type_labels as $key => $label) {
+    $selected = ($key == $filter_type) ? ' selected' : '';
+    print '<option value="'.$key.'"'.$selected.'>'.$label.'</option>';
+}
+print '</select>';
+print '</div>';
+
+// Filtre prévisionnels
+print '<div>';
+print '<label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333;"> Prévisionnels</label>';
+print '<select name="show_previsionnel" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">';
+print '<option value="yes"'.($show_previsionnel ? ' selected' : '').'>Inclure</option>';
+print '<option value="no"'.(!$show_previsionnel ? ' selected' : '').'>Masquer</option>';
+print '</select>';
+print '</div>';
+
+// Bouton filtrer
+print '<div>';
+print '<input type="submit" value="Filtrer" class="button" style="width: 100%;">';
+if ($user->admin) {
+    print '<br><small style="margin-top: 5px; display: block;">';
+    $current_url = $_SERVER['REQUEST_URI'];
+    $debug_url = $current_url . (strpos($current_url, '?') !== false ? '&' : '?') . 'debug=1';
+    print '<a href="'.$debug_url.'" style="color: #666;">Debug SQL</a>';
+    print '</small>';
+}
+print '</div>';
+
+print '</div>';
+print '</form>';
+print '</div>';
+
+// Récupérer les soldes : global et filtré par année si applicable
+if ($filter_year > 0) {
+    // Solde reporté des années précédentes (en excluant les prévisionnels si nécessaire)
+    $sql_previous = "SELECT 
+        COALESCE(SUM(t.amount), 0) as previous_balance
+        FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+        LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
+        LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
+        LEFT JOIN ".MAIN_DB_PREFIX."revenuesharing_contract c ON c.rowid = t.fk_contract
+        WHERE t.fk_collaborator = ".((int) $displayed_collaborator_id)." AND t.status = 1
+        AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) < ".$filter_year;
+    
+    // Exclure les prévisionnels si nécessaire
+    if (!$show_previsionnel) {
+        $sql_previous .= " AND (c.type_contrat IS NULL OR c.type_contrat != 'previsionnel')";
+    }
+    
+    $resql_previous = $db->query($sql_previous);
+    $previous_balance = $resql_previous ? $db->fetch_object($resql_previous)->previous_balance : 0;
+    if ($resql_previous) $db->free($resql_previous);
+    
+    // Mouvements de l'année filtrée (en excluant les prévisionnels si nécessaire)
+    $sql_balance = "SELECT 
+        COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END), 0) as year_credits,
+        COALESCE(SUM(CASE WHEN t.amount < 0 THEN ABS(t.amount) ELSE 0 END), 0) as year_debits,
+        COALESCE(SUM(t.amount), 0) as year_balance,
+        COUNT(*) as nb_transactions,
+        MAX(COALESCE(f.datef, ff.datef, t.transaction_date)) as last_transaction_date
+        FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+        LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
+        LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
+        LEFT JOIN ".MAIN_DB_PREFIX."revenuesharing_contract c ON c.rowid = t.fk_contract
+        WHERE t.fk_collaborator = ".((int) $displayed_collaborator_id)." AND t.status = 1
+        AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) = ".$filter_year;
+        
+    // Exclure les prévisionnels si nécessaire
+    if (!$show_previsionnel) {
+        $sql_balance .= " AND (c.type_contrat IS NULL OR c.type_contrat != 'previsionnel')";
+    }
+} else {
+    // Statistiques globales (pas de filtre)
+    $previous_balance = 0;
+    $sql_balance = "SELECT 
+        COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END), 0) as year_credits,
+        COALESCE(SUM(CASE WHEN t.amount < 0 THEN ABS(t.amount) ELSE 0 END), 0) as year_debits,
+        COALESCE(SUM(t.amount), 0) as year_balance,
+        COUNT(*) as nb_transactions,
+        MAX(COALESCE(f.datef, ff.datef, t.transaction_date)) as last_transaction_date
+        FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+        LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
+        LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
+        LEFT JOIN ".MAIN_DB_PREFIX."revenuesharing_contract c ON c.rowid = t.fk_contract
+        WHERE t.fk_collaborator = ".((int) $displayed_collaborator_id)." AND t.status = 1";
+        
+    // Exclure les prévisionnels si nécessaire
+    if (!$show_previsionnel) {
+        $sql_balance .= " AND (c.type_contrat IS NULL OR c.type_contrat != 'previsionnel')";
+    }
+}
+
+$resql_balance = $db->query($sql_balance);
+$balance_info = $db->fetch_object($resql_balance);
+$db->free($resql_balance);
+
+// Calculer le chiffre d'affaires du collaborateur (séparation réel/prévisionnel)
+$sql_ca = "SELECT 
+    -- CA réel (basé sur les factures)
+    COALESCE(SUM(CASE WHEN f.rowid IS NOT NULL AND c.type_contrat != 'previsionnel' THEN f.total_ht ELSE 0 END), 0) as ca_reel_ht,
+    COALESCE(SUM(CASE WHEN f.rowid IS NOT NULL AND c.type_contrat != 'previsionnel' THEN f.total_ttc ELSE 0 END), 0) as ca_reel_ttc,
+    
+    -- CA prévisionnel (basé sur les contrats prévisionnels)
+    COALESCE(SUM(CASE WHEN c.type_contrat = 'previsionnel' THEN c.amount_ht ELSE 0 END), 0) as ca_previsionnel_ht,
+    
+    -- Totaux combinés
+    COALESCE(SUM(CASE WHEN f.rowid IS NOT NULL AND c.type_contrat != 'previsionnel' THEN f.total_ht ELSE 0 END), 0) + COALESCE(SUM(CASE WHEN c.type_contrat = 'previsionnel' THEN c.amount_ht ELSE 0 END), 0) as ca_total_ht,
+    
+    -- Parts collaborateur séparées
+    COALESCE(SUM(CASE WHEN c.type_contrat != 'previsionnel' THEN c.collaborator_amount_ht ELSE 0 END), 0) as collaborator_reel_ht,
+    COALESCE(SUM(CASE WHEN c.type_contrat = 'previsionnel' THEN c.collaborator_amount_ht ELSE 0 END), 0) as collaborator_previsionnel_ht,
+    COALESCE(SUM(c.collaborator_amount_ht), 0) as collaborator_total_ht,
+    
+    -- Parts structure séparées  
+    COALESCE(SUM(CASE WHEN c.type_contrat != 'previsionnel' THEN c.studio_amount_ht ELSE 0 END), 0) as studio_reel_ht,
+    COALESCE(SUM(CASE WHEN c.type_contrat = 'previsionnel' THEN c.studio_amount_ht ELSE 0 END), 0) as studio_previsionnel_ht,
+    COALESCE(SUM(c.studio_amount_ht), 0) as studio_total_ht,
+    
+    -- Statistiques
+    AVG(c.collaborator_percentage) as avg_percentage,
+    COUNT(DISTINCT f.rowid) as nb_factures_clients,
+    COUNT(DISTINCT CASE WHEN c.type_contrat != 'previsionnel' THEN c.rowid END) as nb_contrats_reels,
+    COUNT(DISTINCT CASE WHEN c.type_contrat = 'previsionnel' THEN c.rowid END) as nb_contrats_previsionnel,
+    COUNT(DISTINCT c.rowid) as nb_contrats_total
+    FROM ".MAIN_DB_PREFIX."revenuesharing_contract c
+    LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = c.fk_facture AND f.fk_statut IN (1,2)
+    WHERE c.fk_collaborator = ".((int) $displayed_collaborator_id)." AND c.status IN (0, 1)";
+
+// Filtre prévisionnels
+if (!$show_previsionnel) {
+    $sql_ca .= " AND (c.type_contrat IS NULL OR c.type_contrat != 'previsionnel')";
+}
+
+if ($filter_year > 0) {
+    // Pour les contrats réels : utiliser la date de facture
+    // Pour les prévisionnels : utiliser date_prestation_prevue ou date_facturation_prevue, sinon date_creation
+    $sql_ca .= " AND (
+        (c.type_contrat != 'previsionnel' AND YEAR(f.datef) = ".$filter_year.") OR
+        (c.type_contrat = 'previsionnel' AND (
+            YEAR(c.date_prestation_prevue) = ".$filter_year." OR 
+            YEAR(c.date_facturation_prevue) = ".$filter_year." OR 
+            (c.date_prestation_prevue IS NULL AND c.date_facturation_prevue IS NULL AND YEAR(c.date_creation) = ".$filter_year.")
+        ))
+    )";
+}
+
+$resql_ca = $db->query($sql_ca);
+if (!$resql_ca) {
+    print '<div style="color: red; padding: 10px; background: #f8d7da;">Erreur SQL contrats: '.$db->lasterror().'</div>';
+    print '<pre style="font-size: 0.8em; background: #f1f1f1; padding: 10px; margin: 10px 0;">'.$sql_ca.'</pre>';
+}
+$ca_info = $db->fetch_object($resql_ca);
+
+// Debug : afficher les résultats de la requête contrats
+if ($user->admin && GETPOST('debug', 'alpha') == '1') {
+    print '<div style="background: #fff3cd; padding: 10px; margin: 10px 0; border-radius: 5px;">';
+    print '<h5>DEBUG - Résultats contrats :</h5>';
+    print '<ul>';
+    print '<li><strong>nb_contrats_total:</strong> '.$ca_info->nb_contrats_total.'</li>';
+    print '<li><strong>nb_contrats_reels:</strong> '.$ca_info->nb_contrats_reels.'</li>';
+    print '<li><strong>nb_contrats_previsionnel:</strong> '.$ca_info->nb_contrats_previsionnel.'</li>';
+    print '<li><strong>ca_reel_ht:</strong> '.price($ca_info->ca_reel_ht).'</li>';
+    print '<li><strong>ca_previsionnel_ht:</strong> '.price($ca_info->ca_previsionnel_ht).'</li>';
+    print '<li><strong>ca_total_ht:</strong> '.price($ca_info->ca_total_ht).'</li>';
+    print '<li><strong>collaborator_reel_ht:</strong> '.price($ca_info->collaborator_reel_ht).'</li>';
+    print '<li><strong>collaborator_previsionnel_ht:</strong> '.price($ca_info->collaborator_previsionnel_ht).'</li>';
+    print '<li><strong>collaborator_total_ht:</strong> '.price($ca_info->collaborator_total_ht).'</li>';
+    print '<li><strong>show_previsionnel:</strong> '.($show_previsionnel ? 'OUI' : 'NON').'</li>';
+    print '</ul>';
+    
+    // Vérifier si le champ type_contrat existe
+    $sql_check = "DESCRIBE ".MAIN_DB_PREFIX."revenuesharing_contract";
+    $resql_check = $db->query($sql_check);
+    $has_type_contrat = false;
+    if ($resql_check) {
+        while ($field = $db->fetch_object($resql_check)) {
+            if ($field->Field == 'type_contrat') {
+                $has_type_contrat = true;
+                break;
+            }
+        }
+        $db->free($resql_check);
+    }
+    
+    print '<li><strong>Champ type_contrat existe:</strong> '.($has_type_contrat ? 'OUI' : 'NON - Exécuter admin/update_contracts_previsionnel.php').'</li>';
+    
+    // Lister les contrats existants
+    $sql_list = "SELECT rowid, ref, type_contrat, status, collaborator_amount_ht FROM ".MAIN_DB_PREFIX."revenuesharing_contract WHERE fk_collaborator = ".((int) $displayed_collaborator_id);
+    $resql_list = $db->query($sql_list);
+    if ($resql_list && $db->num_rows($resql_list) > 0) {
+        print '</ul>';
+        print '<h6>Contrats trouvés :</h6>';
+        print '<table border="1" cellpadding="3" style="font-size: 0.8em;">';
+        print '<tr><th>ID</th><th>Ref</th><th>Type</th><th>Status</th><th>Montant collab</th></tr>';
+        while ($contract = $db->fetch_object($resql_list)) {
+            print '<tr>';
+            print '<td>'.$contract->rowid.'</td>';
+            print '<td>'.$contract->ref.'</td>';
+            print '<td>'.($contract->type_contrat ?: 'NULL').'</td>';
+            print '<td>'.$contract->status.'</td>';
+            print '<td>'.price($contract->collaborator_amount_ht).'</td>';
+            print '</tr>';
+        }
+        print '</table>';
+        $db->free($resql_list);
+    } else {
+        print '</ul>';
+        print '<p><strong>Aucun contrat trouvé pour ce collaborateur</strong></p>';
+    }
+    
+    print '<pre style="font-size: 0.7em; background: #f8f9fa; padding: 5px; margin-top: 10px;">'.$sql_ca.'</pre>';
+    print '</div>';
+}
+
+$db->free($resql_ca);
+
+// Récupérer les déclarations de salaires pour calculer les prévisionnels
+$sql_salaires = "SELECT 
+    COUNT(CASE WHEN status = 1 THEN 1 END) as nb_brouillons,
+    COUNT(CASE WHEN status = 2 THEN 1 END) as nb_valides,
+    COUNT(CASE WHEN status = 3 THEN 1 END) as nb_payes,
+    COALESCE(SUM(CASE WHEN status = 1 THEN solde_utilise ELSE 0 END), 0) as montant_brouillons,
+    COALESCE(SUM(CASE WHEN status = 2 THEN solde_utilise ELSE 0 END), 0) as montant_valides,
+    COALESCE(SUM(CASE WHEN status = 3 THEN solde_utilise ELSE 0 END), 0) as montant_payes,
+    COALESCE(SUM(CASE WHEN status IN (1,2) THEN solde_utilise ELSE 0 END), 0) as montant_previsionnel,
+    COALESCE(SUM(CASE WHEN status = 1 THEN total_days ELSE 0 END), 0) as jours_brouillons,
+    COALESCE(SUM(CASE WHEN status = 2 THEN total_days ELSE 0 END), 0) as jours_valides,
+    COALESCE(SUM(CASE WHEN status = 3 THEN total_days ELSE 0 END), 0) as jours_payes
+    FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration 
+    WHERE fk_collaborator = ".((int) $displayed_collaborator_id);
+
+if ($filter_year > 0) {
+    $sql_salaires .= " AND declaration_year = ".$filter_year;
+}
+
+$resql_salaires = $db->query($sql_salaires);
+$salaires_info = $db->fetch_object($resql_salaires);
+$db->free($resql_salaires);
+
+// En-tête du compte
+print '<div class="fichecenter">';
+print '<div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin: 20px 0;">';
+
+print '<div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap;">';
+
+// Infos collaborateur
+print '<div>';
+print '<h3 style="margin: 0 0 10px 0; color: #007cba;"> '.dol_escape_htmltag($collaborator->label).'</h3>';
+if ($collaborator->firstname && $collaborator->lastname) {
+    print '<p style="margin: 5px 0; color: #666;"><strong>Nom complet :</strong> '.$collaborator->firstname.' '.$collaborator->lastname.'</p>';
+}
+if ($collaborator->email) {
+    print '<p style="margin: 5px 0; color: #666;"><strong>Email :</strong> '.$collaborator->email.'</p>';
+}
+if ($collaborator->default_percentage) {
+    print '<p style="margin: 5px 0; color: #666;"><strong>% défaut :</strong> '.$collaborator->default_percentage.'%</p>';
+}
+print '<p style="margin: 5px 0; color: #666;"><strong>Statut :</strong> '.($collaborator->active ? 'Actif' : 'Inactif').'</p>';
+print '</div>';
+
+// Afficher le chiffre d'affaires et la répartition du collaborateur
+print '<div style="margin-top: 15px; padding: 15px; background: #e8f5e8; border: 1px solid #c3e6c3; border-radius: 8px;">';
+print '<h4 style="margin: 0 0 15px 0; color: #2d7d2d;">Chiffre d\'Affaires & Répartition</h4>';
+
+// Indicateur de filtrage prévisionnels
+if (!$show_previsionnel) {
+    print '<div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 8px; margin-bottom: 10px; text-align: center;">';
+    print '<small style="color: #856404;">Contrats prévisionnels masqués</small>';
+    print '</div>';
+} else {
+    print '<div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px; padding: 8px; margin-bottom: 10px; text-align: center;">';
+    print '<small style="color: #0d47a1;"> Contrats prévisionnels inclus</small>';
+    print '</div>';
+}
+
+if ($ca_info->ca_total_ht > 0 || $ca_info->ca_previsionnel_ht > 0) {
+    
+    // Section Chiffre d'Affaires détaillé
+    print '<div style="background: white; border-radius: 6px; padding: 12px; margin-bottom: 15px;">';
+    print '<h5 style="margin: 0 0 15px 0; color: #2d7d2d;">Chiffre d\'Affaires Détaillé</h5>';
+    
+    // Ligne 1 : CA Réel et Prévisionnel
+    print '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; text-align: center; margin-bottom: 15px;">';
+    
+    print '<div style="background: #e8f5e8; padding: 12px; border-radius: 4px; border-left: 4px solid #28a745;">';
+    print '<div style="font-size: 1.2em; font-weight: bold; color: #155724;">'.price($ca_info->ca_reel_ht).'</div>';
+    print '<div style="font-size: 0.9em; color: #666; margin-bottom: 3px;">CA Réel HT</div>';
+    print '<div style="font-size: 0.8em; color: #155724;">'.$ca_info->nb_contrats_reels.' contrat(s) • '.$ca_info->nb_factures_clients.' facture(s)</div>';
+    print '</div>';
+    
+    if ($show_previsionnel && $ca_info->ca_previsionnel_ht > 0) {
+        print '<div style="background: #e3f2fd; padding: 12px; border-radius: 4px; border-left: 4px solid #007cba;">';
+        print '<div style="font-size: 1.2em; font-weight: bold; color: #007cba;">'.price($ca_info->ca_previsionnel_ht).'</div>';
+        print '<div style="font-size: 0.9em; color: #666; margin-bottom: 3px;">CA Prévisionnel HT</div>';
+        print '<div style="font-size: 0.8em; color: #007cba;">'.$ca_info->nb_contrats_previsionnel.' contrat(s) • estimations</div>';
+        print '</div>';
+    } else {
+        print '<div style="background: #f8f9fa; padding: 12px; border-radius: 4px; text-align: center; color: #6c757d;">';
+        if (!$show_previsionnel) {
+            print '<div style="font-size: 0.9em;">Prévisionnels masqués</div>';
+        } else {
+            print '<div style="font-size: 0.9em;">Aucun prévisionnel</div>';
+        }
+        print '</div>';
+    }
+    
+    print '<div style="background: #fff3e0; padding: 12px; border-radius: 4px; border-left: 4px solid #f57c00;">';
+    print '<div style="font-size: 1.3em; font-weight: bold; color: #f57c00;">'.price($ca_info->ca_total_ht).'</div>';
+    print '<div style="font-size: 0.9em; color: #666; margin-bottom: 3px;">CA Total HT</div>';
+    print '<div style="font-size: 0.8em; color: #f57c00;">';
+    if ($show_previsionnel && $ca_info->ca_previsionnel_ht > 0) {
+        print 'Réel + Prévisionnel';
+    } else {
+        print 'Réel uniquement';  
+    }
+    print '</div>';
+    print '</div>';
+    
+    print '</div>';
+    print '</div>';
+    
+    // Section Répartition détaillée
+    if ($ca_info->collaborator_total_ht > 0 || $ca_info->studio_total_ht > 0) {
+        print '<div style="background: white; border-radius: 6px; padding: 12px;">';
+        print '<h5 style="margin: 0 0 15px 0; color: #007cba;">Répartition des Montants</h5>';
+        
+        // Ligne 1 : Parts collaborateur détaillées
+        print '<div style="margin-bottom: 15px;">';
+        print '<h6 style="margin: 0 0 8px 0; color: #666; font-size: 0.9em;"> PARTS COLLABORATEUR</h6>';
+        print '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; text-align: center;">';
+        
+        // Part réelle
+        print '<div style="background: #e8f5e8; padding: 10px; border-radius: 4px; border-left: 3px solid #28a745;">';
+        print '<div style="font-size: 1.1em; font-weight: bold; color: #155724;">'.price($ca_info->collaborator_reel_ht).'</div>';
+        print '<div style="font-size: 0.8em; color: #666;">Réel</div>';
+        print '</div>';
+        
+        // Part prévisionnelle
+        if ($show_previsionnel && $ca_info->collaborator_previsionnel_ht > 0) {
+            print '<div style="background: #e3f2fd; padding: 10px; border-radius: 4px; border-left: 3px solid #007cba;">';
+            print '<div style="font-size: 1.1em; font-weight: bold; color: #007cba;">'.price($ca_info->collaborator_previsionnel_ht).'</div>';
+            print '<div style="font-size: 0.8em; color: #666;">Prévisionnel</div>';
+            print '</div>';
+        } else {
+            print '<div style="background: #f8f9fa; padding: 10px; border-radius: 4px; color: #6c757d;">';
+            print '<div style="font-size: 0.9em;">-</div>';
+            print '<div style="font-size: 0.8em;">Prévisionnel</div>';
+            print '</div>';
+        }
+        
+        // Total collaborateur
+        $total_repartition = $ca_info->collaborator_total_ht + $ca_info->studio_total_ht;
+        $collab_percent = $total_repartition > 0 ? ($ca_info->collaborator_total_ht / $total_repartition * 100) : 0;
+        print '<div style="background: #e3f2fd; padding: 10px; border-radius: 4px; border: 2px solid #007cba;">';
+        print '<div style="font-size: 1.2em; font-weight: bold; color: #007cba;">'.price($ca_info->collaborator_total_ht).'</div>';
+        print '<div style="font-size: 0.8em; color: #666;">Total ('.number_format($collab_percent, 1).'%)</div>';
+        print '</div>';
+        
+        print '</div>';
+        print '</div>';
+        
+        // Ligne 2 : Parts structure détaillées
+        print '<div style="margin-bottom: 15px;">';
+        print '<h6 style="margin: 0 0 8px 0; color: #666; font-size: 0.9em;"> PARTS STRUCTURE</h6>';
+        print '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; text-align: center;">';
+        
+        // Part structure réelle
+        print '<div style="background: #fff3e0; padding: 10px; border-radius: 4px; border-left: 3px solid #f57c00;">';
+        print '<div style="font-size: 1.1em; font-weight: bold; color: #f57c00;">'.price($ca_info->studio_reel_ht).'</div>';
+        print '<div style="font-size: 0.8em; color: #666;">Réel</div>';
+        print '</div>';
+        
+        // Part structure prévisionnelle
+        if ($show_previsionnel && $ca_info->studio_previsionnel_ht > 0) {
+            print '<div style="background: #e0f2f1; padding: 10px; border-radius: 4px; border-left: 3px solid #00695c;">';
+            print '<div style="font-size: 1.1em; font-weight: bold; color: #00695c;">'.price($ca_info->studio_previsionnel_ht).'</div>';
+            print '<div style="font-size: 0.8em; color: #666;">Prévisionnel</div>';
+            print '</div>';
+        } else {
+            print '<div style="background: #f8f9fa; padding: 10px; border-radius: 4px; color: #6c757d;">';
+            print '<div style="font-size: 0.9em;">-</div>';
+            print '<div style="font-size: 0.8em;">Prévisionnel</div>';
+            print '</div>';
+        }
+        
+        // Total structure
+        $studio_percent = $total_repartition > 0 ? ($ca_info->studio_total_ht / $total_repartition * 100) : 0;
+        print '<div style="background: #fff3e0; padding: 10px; border-radius: 4px; border: 2px solid #f57c00;">';
+        print '<div style="font-size: 1.2em; font-weight: bold; color: #f57c00;">'.price($ca_info->studio_total_ht).'</div>';
+        print '<div style="font-size: 0.8em; color: #666;">Total ('.number_format($studio_percent, 1).'%)</div>';
+        print '</div>';
+        
+        print '</div>';
+        print '</div>';
+        
+        // Ligne 3 : Statistiques
+        if ($ca_info->avg_percentage > 0) {
+            print '<div style="text-align: center; background: #f3e5f5; padding: 10px; border-radius: 4px;">';
+            print '<span style="color: #7b1fa2; font-weight: bold;">% Moyen collaborateur : '.number_format($ca_info->avg_percentage, 1).'%</span>';
+            print '</div>';
+        }
+        
+        print '</div>';
+    }
+    
+    // Info complémentaire
+    print '<div style="text-align: center; margin-top: 15px; font-size: 0.9em; color: #666; background: #f8f9fa; padding: 10px; border-radius: 4px;">';
+    print '<span style="margin-right: 15px;">'.$ca_info->nb_contrats_total.' contrat(s) total</span>';
+    if ($ca_info->nb_contrats_reels > 0) {
+        print '<span style="margin-right: 15px;">'.$ca_info->nb_contrats_reels.' réel(s)</span>';
+    }
+    if ($show_previsionnel && $ca_info->nb_contrats_previsionnel > 0) {
+        print '<span style="margin-right: 15px;"> '.$ca_info->nb_contrats_previsionnel.' prév.</span>';
+    }
+    if ($filter_year > 0) {
+        print '<span>Année '.$filter_year.'</span>';
+    } else {
+        print '<span>Toutes années</span>';
+    }
+    print '</div>';
+    
+} else {
+    print '<div style="text-align: center; padding: 20px; color: #666; font-style: italic;">';
+    print '<div style="font-size: 2em; margin-bottom: 10px;"></div>';
+    print '<div>Aucune facture client associée';
+    if ($filter_year > 0) {
+        print ' pour l\'année '.$filter_year;
+    }
+    print '</div>';
+    if ($ca_info->nb_contrats > 0) {
+        print '<div style="margin-top: 5px; font-size: 0.9em;">('.$ca_info->nb_contrats.' contrat(s) sans facture)</div>';
+    }
+    print '</div>';
+}
+print '</div>';
+
+// Calculer le solde cumulé (nécessaire pour les prévisionnels)
+if ($filter_year > 0) {
+    $cumulative_balance = $previous_balance + $balance_info->year_balance;
+} else {
+    $cumulative_balance = $balance_info->year_balance;
+}
+
+// Section Déclarations de Salaires
+print '<div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #dee2e6;">';
+print '<h3 style="margin: 0 0 15px 0; color: #007cba; display: flex; align-items: center;">';
+print '<span style="margin-right: 10px;"></span> Déclarations de Salaires';
+if ($filter_year > 0) {
+    print ' - '.$filter_year;
+}
+print '</h3>';
+
+if ($salaires_info->nb_brouillons > 0 || $salaires_info->nb_valides > 0 || $salaires_info->nb_payes > 0) {
+    // Statistiques générales
+    print '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">';
+    
+    // Brouillons
+    if ($salaires_info->nb_brouillons > 0) {
+        print '<div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 15px; text-align: center;">';
+        print '<div style="font-size: 1.5em; margin-bottom: 5px;"></div>';
+        print '<div style="font-size: 1.2em; font-weight: bold; color: #856404;">'.$salaires_info->nb_brouillons.'</div>';
+        print '<div style="font-size: 0.9em; color: #666;">Brouillon(s)</div>';
+        print '<div style="font-size: 0.8em; color: #666; margin-top: 5px;">'.$salaires_info->jours_brouillons.' jour(s)</div>';
+        print '</div>';
+    }
+    
+    // Validées
+    if ($salaires_info->nb_valides > 0) {
+        print '<div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 15px; text-align: center;">';
+        print '<div style="font-size: 1.5em; margin-bottom: 5px;"></div>';
+        print '<div style="font-size: 1.2em; font-weight: bold; color: #155724;">'.$salaires_info->nb_valides.'</div>';
+        print '<div style="font-size: 0.9em; color: #666;">Validée(s)</div>';
+        print '<div style="font-size: 0.8em; color: #666; margin-top: 5px;">'.$salaires_info->jours_valides.' jour(s)</div>';
+        print '</div>';
+    }
+    
+    // Payées
+    if ($salaires_info->nb_payes > 0) {
+        print '<div style="background: #cce5f0; border: 1px solid #9fc5e8; border-radius: 8px; padding: 15px; text-align: center;">';
+        print '<div style="font-size: 1.5em; margin-bottom: 5px;"></div>';
+        print '<div style="font-size: 1.2em; font-weight: bold; color: #007cba;">'.$salaires_info->nb_payes.'</div>';
+        print '<div style="font-size: 0.9em; color: #666;">Payée(s)</div>';
+        print '<div style="font-size: 0.8em; color: #666; margin-top: 5px;">'.$salaires_info->jours_payes.' jour(s)</div>';
+        print '</div>';
+    }
+    
+    print '</div>';
+    
+    // Section prévisionnel si il y a des brouillons ou validées
+    if ($salaires_info->montant_previsionnel > 0) {
+        print '<div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 15px; margin: 15px 0;">';
+        print '<h4 style="margin: 0 0 10px 0; color: #721c24;">Impact Prévisionnel</h4>';
+        print '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">';
+        
+        print '<div style="text-align: center;">';
+        print '<div style="font-size: 1.1em; color: #dc3545;">- '.price($salaires_info->montant_previsionnel).'</div>';
+        print '<div style="font-size: 0.9em; color: #666;">Solde à déduire</div>';
+        print '</div>';
+        
+        $solde_previsionnel = $cumulative_balance - $salaires_info->montant_previsionnel;
+        $color_previsionnel = $solde_previsionnel >= 0 ? '#28a745' : '#dc3545';
+        print '<div style="text-align: center;">';
+        print '<div style="font-size: 1.3em; font-weight: bold; color: '.$color_previsionnel.';">'.price($solde_previsionnel).'</div>';
+        print '<div style="font-size: 0.9em; color: #666;">Solde prévisionnel</div>';
+        print '</div>';
+        
+        print '</div>';
+        
+        if ($salaires_info->nb_brouillons > 0) {
+            print '<div style="font-size: 0.8em; color: #666; margin-top: 10px; text-align: center;">';
+            print 'Inclut '.$salaires_info->nb_brouillons.' brouillon(s) non validé(s)';
+            print '</div>';
+        }
+        print '</div>';
+    }
+    
+    // Lien vers les déclarations
+    print '<div style="text-align: center; margin-top: 15px;">';
+    print '<a href="salary_declarations_list.php?collaborator_filter='.$displayed_collaborator_id.'" class="button">';
+    print img_picto('', 'eye', 'class="pictofixedwidth"').' Voir toutes les déclarations</a>';
+    print '</div>';
+    
+} else {
+    print '<div style="text-align: center; padding: 20px; color: #666;">';
+    print '<div style="font-size: 2em; margin-bottom: 10px;"></div>';
+    print '<div>Aucune déclaration de salaire';
+    if ($filter_year > 0) {
+        print ' pour '.$filter_year;
+    }
+    print '</div>';
+    print '<div style="margin-top: 10px;">';
+    print '<a href="salary_declaration_form.php?collaborator_id='.$displayed_collaborator_id.'" class="button">';
+    print img_picto('', 'add', 'class="pictofixedwidth"').' Créer une déclaration</a>';
+    print '</div>';
+    print '</div>';
+}
+
+print '</div>';
+
+// Résumé financier avec solde cumulé
+if ($filter_year > 0) {
+    $cumulative_balance = $previous_balance + $balance_info->year_balance;
+} else {
+    $cumulative_balance = $balance_info->year_balance;
+}
+
+$balance_color = ($cumulative_balance >= 0) ? '#28a745' : '#dc3545';
+print '<div style="text-align: right;">';
+print '<div style="margin-top: 10px; font-size: 0.9em;">';
+
+if ($filter_year > 0) {
+    // Affichage détaillé pour une année filtrée - solde reporté d'abord
+    print '<span style="color: #666;">Solde reporté: '.price($previous_balance).'</span><br>';
+    print '<span style="color: green;">Crédits '.$filter_year.': '.price($balance_info->year_credits).'</span><br>';
+    print '<span style="color: red;">Débits '.$filter_year.': '.price($balance_info->year_debits).'</span><br>';
+    print '<span style="color: #666;">'.$balance_info->nb_transactions.' transaction(s) en '.$filter_year.'</span><br>';
+} else {
+    // Affichage global
+    print '<span style="color: green;">Crédits: '.price($balance_info->year_credits).'</span><br>';
+    print '<span style="color: red;">Débits: '.price($balance_info->year_debits).'</span><br>';
+    print '<span style="color: #666;">'.$balance_info->nb_transactions.' transaction(s)</span><br>';
+}
+
+// Solde cumulé en dernier, mis en évidence
+print '<div style="font-size: 2em; font-weight: bold; color: '.$balance_color.'; margin-top: 10px;">'.price($cumulative_balance).'</div>';
+if ($filter_year > 0) {
+    print '<div style="color: #666; font-size: 0.9em;">Solde cumulé au '.$filter_year.'</div>';
+} else {
+    print '<div style="color: #666; font-size: 0.9em;">Solde actuel</div>';
+}
+
+// Indication sur l'inclusion/exclusion des prévisionnels dans le solde
+if ($show_previsionnel) {
+    print '<div style="color: #007cba; font-size: 0.8em; margin-top: 5px; font-style: italic;"> Inclut les contrats prévisionnels</div>';
+} else {
+    print '<div style="color: #666; font-size: 0.8em; margin-top: 5px; font-style: italic;">Contrats réels uniquement</div>';
+}
+if ($balance_info->last_transaction_date) {
+    print '<br><span style="color: #666;">'.dol_print_date($db->jdate($balance_info->last_transaction_date), 'day').'</span>';
+}
+print '</div>';
+print '</div>';
+
+print '</div>';
+print '</div>';
+
+// Statistiques par type d'opération (avec filtre année si applicable)
+$sql_stats = "SELECT 
+    t.transaction_type,
+    COUNT(*) as nb_operations,
+    SUM(t.amount) as total_amount
+    FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+    LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
+    LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
+    LEFT JOIN ".MAIN_DB_PREFIX."revenuesharing_contract c ON c.rowid = t.fk_contract
+    WHERE t.fk_collaborator = ".$displayed_collaborator_id." AND t.status = 1";
+
+if ($filter_year) {
+    $sql_stats .= " AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) = ".$filter_year;
+}
+
+// Exclure les prévisionnels si nécessaire
+if (!$show_previsionnel) {
+    $sql_stats .= " AND (c.type_contrat IS NULL OR c.type_contrat != 'previsionnel')";
+}
+
+$sql_stats .= " GROUP BY t.transaction_type ORDER BY total_amount DESC";
+
+$resql_stats = $db->query($sql_stats);
+if ($resql_stats && $db->num_rows($resql_stats) > 0) {
+    if ($filter_year > 0) {
+        print '<h4>Répartition par type d\'opération ('.$filter_year.')</h4>';
+    } else {
+        print '<h4>Répartition par type d\'opération</h4>';
+    }
+    print '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0;">';
+    
+    
+    while ($stat = $db->fetch_object($resql_stats)) {
+        $color = ($stat->total_amount >= 0) ? '#d4edda' : '#f8d7da';
+        $text_color = ($stat->total_amount >= 0) ? '#155724' : '#721c24';
+        
+        print '<div style="background: '.$color.'; padding: 15px; border-radius: 8px; text-align: center;">';
+        print '<div style="font-weight: bold; color: '.$text_color.';">'.$type_labels[$stat->transaction_type].'</div>';
+        print '<div style="font-size: 1.2em; font-weight: bold; color: '.$text_color.';">'.price($stat->total_amount).'</div>';
+        print '<div style="font-size: 0.9em; color: #666;">'.$stat->nb_operations.' opération(s)</div>';
+        print '</div>';
+    }
+    
+    print '</div>';
+    $db->free($resql_stats);
+}
+
+// Historique des transactions
+print '<h4>Historique des transactions</h4>';
+
+// Historique des transactions
+$sql_trans = "SELECT t.*, 
+              c.ref as contract_ref, c.label as contract_label,
+              f.ref as facture_ref, f.datef as facture_date, 
+              ff.ref as facture_fourn_ref, ff.datef as facture_fourn_date, ff.libelle as facture_fourn_label,
+              u.login as user_login,
+              COALESCE(f.datef, ff.datef, t.transaction_date) as display_date
+    FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+    LEFT JOIN ".MAIN_DB_PREFIX."revenuesharing_contract c ON c.rowid = t.fk_contract
+    LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture  
+    LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
+    LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = t.fk_user_creat
+    WHERE t.fk_collaborator = ".((int) $displayed_collaborator_id)." AND t.status = 1";
+
+if ($filter_type) {
+    $sql_trans .= " AND t.transaction_type = '".$db->escape($filter_type)."'";
+}
+if ($filter_year) {
+    $sql_trans .= " AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) = ".$filter_year;
+}
+
+$sql_trans .= " ORDER BY COALESCE(f.datef, ff.datef, t.transaction_date) DESC, t.date_creation DESC LIMIT 100";
+
+$resql_trans = $db->query($sql_trans);
+if ($resql_trans) {
+    $num_trans = $db->num_rows($resql_trans);
+    
+    if ($num_trans > 0) {
+        print '<div class="div-table-responsive-no-min">';
+        print '<table class="noborder centpercent">';
+        print '<tr class="liste_titre">';
+        print '<th>Date</th>';
+        print '<th>Type</th>';
+        print '<th>Réf. client</th>';
+        print '<th>Description</th>';
+        print '<th class="center">Montant</th>';
+        print '<th class="center">Lié à</th>';
+        print '<th class="center"> Par</th>';
+        print '<th class="center">Actions</th>';
+        print '</tr>';
+        
+        $running_balance = 0;
+        while ($trans = $db->fetch_object($resql_trans)) {
+            $running_balance += $trans->amount;
+            
+            print '<tr class="oddeven">';
+            
+            // Date (priorité: date facture client, puis facture fournisseur, puis transaction)
+            print '<td>'.dol_print_date($db->jdate($trans->display_date), 'day').'</td>';
+            
+            // Type avec couleur selon crédit/débit
+            print '<td>';
+            $credit_types = array('contract', 'commission', 'bonus', 'interest', 'other_credit');
+            $is_credit = in_array($trans->transaction_type, $credit_types);
+            $type_color = $is_credit ? '#28a745' : '#dc3545'; // Vert pour crédit, rouge pour débit
+            $type_bg = $is_credit ? '#d4edda' : '#f8d7da'; // Fond plus clair
+            
+            print '<span style="color: '.$type_color.'; background: '.$type_bg.'; padding: 2px 6px; border-radius: 12px; font-size: 0.9em; font-weight: 500;">';
+            print $type_labels[$trans->transaction_type];
+            print '</span>';
+            print '</td>';
+            
+            // Réf. client (du contrat ou de la facture liée)
+            print '<td>';
+            if ($trans->fk_contract && $trans->contract_label) {
+                $label = dol_escape_htmltag($trans->contract_label);
+                if (strlen($label) > 60) {
+                    $label = substr($label, 0, 60) . '...';
+                }
+                print '<span style="color: #007cba; font-weight: 500;">'.$label.'</span>';
+            } elseif ($trans->fk_facture_fourn && $trans->facture_fourn_label) {
+                $label = dol_escape_htmltag($trans->facture_fourn_label);
+                if (strlen($label) > 60) {
+                    $label = substr($label, 0, 60) . '...';
+                }
+                print '<span style="color: #fd7e14; font-weight: 500;"> '.$label.'</span>';
+            } else {
+                print '<span style="color: #666; font-style: italic;">-</span>';
+            }
+            print '</td>';
+            
+            // Description
+            print '<td>';
+            // Limiter la description à 50 caractères pour un affichage plus propre
+            $description = dol_escape_htmltag($trans->description);
+            if (strlen($description) > 50) {
+                $description = substr($description, 0, 50) . '...';
+            }
+            print '<span style="font-weight: 500;">'.$description.'</span>';
+            
+            // Note privée plus discrète
+            if ($trans->note_private) {
+                $note = dol_escape_htmltag($trans->note_private);
+                if (strlen($note) > 30) {
+                    $note = substr($note, 0, 30) . '...';
+                }
+                print '<br><small style="color: #888; font-size: 0.8em;">'.$note.'</small>';
+            }
+            print '</td>';
+            
+            // Montant avec couleur améliorée
+            if ($trans->amount >= 0) {
+                $amount_color = '#28a745';
+                $amount_bg = '#d4edda';
+                $amount_icon = '';
+            } else {
+                $amount_color = '#dc3545';
+                $amount_bg = '#f8d7da';
+                $amount_icon = '';
+            }
+            
+            print '<td class="center">';
+            print '<span style="color: '.$amount_color.'; background: '.$amount_bg.'; padding: 4px 8px; border-radius: 8px; font-weight: bold; font-size: 0.95em;">';
+            print $amount_icon.' '.price($trans->amount);
+            print '</span>';
+            print '</td>';
+            
+            // Lié à
+            print '<td class="center">';
+            if ($trans->fk_contract && $trans->contract_ref) {
+                print '<a href="contract_card_complete.php?id='.$trans->fk_contract.'">'.$trans->contract_ref.'</a>';
+            } elseif ($trans->fk_facture && $trans->facture_ref) {
+                print ' '.$trans->facture_ref;
+            } elseif ($trans->fk_facture_fourn && $trans->facture_fourn_ref) {
+                print ' '.$trans->facture_fourn_ref.' <small style="color: #666;">(Fournisseur)</small>';
+            } else {
+                print '<span style="color: #ccc;">-</span>';
+            }
+            print '</td>';
+            
+            // Créé par
+            print '<td class="center">';
+            print '<small>'.$trans->user_login.'</small>';
+            print '</td>';
+            
+            // Actions
+            print '<td class="center">';
+            print '<div class="transaction-actions" data-transaction-id="'.$trans->rowid.'">';
+            
+            // Bouton Éditer
+            print '<button class="btn-edit-transaction" title="Éditer cette transaction" ';
+            print 'data-transaction-id="'.$trans->rowid.'" ';
+            print 'data-amount="'.$trans->amount.'" ';
+            print 'data-description="'.dol_escape_htmltag($trans->description).'" ';
+            print 'data-note="'.dol_escape_htmltag($trans->note_private).'" ';
+            print 'data-type="'.$trans->transaction_type.'" ';
+            print 'style="background: #007cba; color: white; border: none; padding: 5px 8px; border-radius: 3px; cursor: pointer; margin-right: 5px;">';
+            print img_picto('', 'edit');
+            print '</button>';
+            
+            // Bouton Supprimer (seulement pour les transactions non liées à des contrats/factures)
+            if (!$trans->fk_contract && !$trans->fk_facture && !$trans->fk_facture_fourn) {
+                print '<button class="btn-delete-transaction" title="Supprimer cette transaction" ';
+                print 'data-transaction-id="'.$trans->rowid.'" ';
+                print 'onclick="confirmDeleteTransaction('.$trans->rowid.', \''.$id.'\')" ';
+                print 'style="background: #dc3545; color: white; border: none; padding: 5px 8px; border-radius: 3px; cursor: pointer;">';
+                print img_picto('', 'delete');
+                print '</button>';
+            }
+            
+            print '</div>';
+            print '</td>';
+            
+            print '</tr>';
+        }
+        
+        print '</table>';
+        print '</div>';
+        
+    } else {
+        print '<div style="text-align: center; padding: 40px; color: #666;">';
+        print '<div style="font-size: 3em;"></div>';
+        print '<h3>Aucune transaction trouvée</h3>';
+        if ($filter_type || $filter_year) {
+            print '<p>Essayez de modifier les filtres ci-dessus</p>';
+        }
+        print '</div>';
+    }
+    
+    $db->free($resql_trans);
+} else {
+    print '<div style="color: red;">Erreur SQL : '.$db->lasterror().'</div>';
+}
+
+print '</div>';
+
+// Section Export
+print '<div style="background: #f0f8ff; border: 1px solid #b8d4f0; border-radius: 8px; padding: 15px; margin: 20px 0;">';
+print '<h4 style="margin: 0 0 10px 0; color: #1e6ba8;">Export du relevé de compte</h4>';
+print '<p style="margin: 5px 0; color: #666;">Exportez le relevé de compte avec les filtres actuellement appliqués</p>';
+
+// Formulaire d'export
+print '<form method="GET" action="export_account.php" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px;">';
+print '<input type="hidden" name="id" value="'.$id.'">';
+print '<input type="hidden" name="action" value="export">';
+print '<input type="hidden" name="token" value="'.newToken().'">';
+
+// Reprendre les filtres actuels
+if ($filter_type) {
+    print '<input type="hidden" name="filter_type" value="'.$filter_type.'">';
+}
+if ($filter_year) {
+    print '<input type="hidden" name="filter_year" value="'.$filter_year.'">';
+}
+// Toujours transmettre le paramètre show_previsionnel
+print '<input type="hidden" name="show_previsionnel" value="'.($show_previsionnel ? '1' : '0').'">';
+
+print '<button type="submit" name="format" value="pdf" class="butAction" style="background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">'.img_picto('', 'pdf', 'class="pictofixedwidth"').' Export PDF</button>';
+print '<button type="submit" name="format" value="excel" class="butAction" style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">'.img_picto('', 'object_xls', 'class="pictofixedwidth"').' Export Excel</button>';
+
+if ($filter_type || $filter_year) {
+    print '<small style="color: #666; font-style: italic;">Avec filtres: ';
+    if ($filter_type) print 'Type='.$filter_type.' ';
+    if ($filter_year) print 'Année='.$filter_year;
+    print '</small>';
+}
+
+print '</form>';
+print '</div>';
+
+print '<div class="tabsAction">';
+print '<a href="account_transaction.php?collaborator_id='.$displayed_collaborator_id.'" class="butAction" style="background: #28a745; color: white;">'.img_picto('', 'add', 'class="pictofixedwidth"').' Nouvelle Opération</a>';
+print '<a href="account_list.php" class="butAction">'.img_picto('', 'bank', 'class="pictofixedwidth"').' Tous les Comptes</a>';
+print '<a href="collaborator_card.php?id='.$displayed_collaborator_id.'" class="butAction">'.img_picto('', 'user', 'class="pictofixedwidth"').' Fiche Collaborateur</a>';
+print '<a href="index.php" class="butAction">'.img_picto('', 'back', 'class="pictofixedwidth"').' Dashboard</a>';
+print '</div>';
+
+// Vérifier comment obtenir les labels de types pour JavaScript
+$type_labels_js = array(
+    'contract' => 'Contrat',
+    'commission' => 'Commission',
+    'bonus' => 'Bonus', 
+    'interest' => 'Intérêt',
+    'advance' => 'Avance',
+    'fee' => 'Frais',
+    'refund' => 'Remboursement',
+    'adjustment' => 'Ajustement',
+    'salary' => 'Salaire',
+    'other_credit' => 'Autre crédit',
+    'other_debit' => 'Autre débit'
+);
+?>
+
+<!-- Modal d'édition de transaction -->
+<div id="editTransactionModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div style="background-color: white; margin: 2% auto; border-radius: 8px; width: 90%; max-width: 700px; height: 90%; max-height: 800px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); display: flex; flex-direction: column;">
+        
+        <!-- En-tête fixe -->
+        <div style="padding: 20px 20px 15px 20px; border-bottom: 1px solid #ddd; flex-shrink: 0;">
+            <h3 style="margin: 0; color: #007cba;"> Éditer la transaction</h3>
+        </div>
+        
+        <!-- Zone de contenu avec scrollbar -->
+        <div style="flex: 1; overflow-y: auto; padding: 20px;">
+            <form id="editTransactionForm" method="POST" action="edit_transaction.php">
+                <input type="hidden" name="action" value="update">
+                <input type="hidden" name="transaction_id" id="edit_transaction_id">
+                <input type="hidden" name="collaborator_id" value="<?php echo $id; ?>">
+                <input type="hidden" name="token" value="<?php echo newToken(); ?>">
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="edit_transaction_type" style="display: block; font-weight: bold; margin-bottom: 5px;">Type de transaction:</label>
+                    <select name="transaction_type" id="edit_transaction_type" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                        <?php foreach ($type_labels_js as $key => $label): ?>
+                        <option value="<?php echo $key; ?>"><?php echo $label; ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="edit_amount" style="display: block; font-weight: bold; margin-bottom: 5px;">Montant (€):</label>
+                    <input type="number" name="amount" id="edit_amount" step="0.01" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" required>
+                    <small style="color: #666; display: block; margin-top: 5px;" id="amount_help">Si vous venez de supprimer une liaison facture, vous pouvez fermer cette fenêtre sans modifier le montant.</small>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="edit_description" style="display: block; font-weight: bold; margin-bottom: 5px;">Description:</label>
+                    <input type="text" name="description" id="edit_description" autocomplete="off" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" required>
+                </div>
+                
+                <!-- Section Libellé (contrat/facture liée) -->
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Réf. client (contrat/facture liée):</label>
+                    <div id="edit_label_display" style="background: #f8f9fa; padding: 8px; border: 1px solid #e9ecef; border-radius: 4px; min-height: 20px; color: #666; font-style: italic; position: relative;">
+                        Aucune réf. client (transaction non liée)
+                    </div>
+                    <div id="edit_label_actions" style="margin-top: 5px; display: none;">
+                        <small style="color: #007cba;">
+                            <em>La réf. client peut être modifiée via la page de gestion des contrats</em>
+                        </small>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <label for="edit_note_private" style="display: block; font-weight: bold; margin-bottom: 5px;">Note privée:</label>
+                    <textarea name="note_private" id="edit_note_private" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;"></textarea>
+                </div>
+            
+            <!-- Section Liaison Contrat/Facture Client (pour les crédits) -->
+            <div id="contract_section_modal" style="margin-bottom: 20px; border-top: 1px solid #ddd; padding-top: 15px; display: none;">
+                <h4 style="margin: 0 0 10px 0; color: #007cba;">Liaison avec contrat/facture client</h4>
+                
+                <!-- Contrat actuellement lié -->
+                <div id="current_contract" style="margin-bottom: 15px;">
+                    <div id="current_contract_info"></div>
+                </div>
+                
+                <!-- Actions sur le contrat -->
+                <div style="margin-bottom: 10px;">
+                    <button type="button" onclick="editContractWithFallback()" style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; margin-right: 10px;"><?php print img_picto('', 'edit'); ?> Éditer le contrat</button>
+                    <button type="button" onclick="unlinkContract()" style="background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;"><?php print img_picto('', 'unlink'); ?> Délier le contrat</button>
+                </div>
+                
+                <!-- Sélection d'un nouveau contrat -->
+                <div style="margin-bottom: 10px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Lier à un contrat:</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="contract_select" style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                            <option value="">Sélectionner un contrat...</option>
+                        </select>
+                        <button type="button" onclick="linkContract()" style="background: #007cba; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;"><?php print img_picto('', 'link'); ?> Lier</button>
+                    </div>
+                </div>
+                
+                <!-- Messages pour contrat -->
+                <div id="contract_transaction_messages" style="margin-top: 10px;"></div>
+            </div>
+            
+            <!-- Section Liaison Facture Fournisseur (seulement pour les débits) -->
+            <div id="supplier_invoice_section_modal" style="margin-bottom: 20px; border-top: 1px solid #ddd; padding-top: 15px; display: none;">
+                <h4 style="margin: 0 0 10px 0; color: #007cba;">Liaison avec facture fournisseur</h4>
+                
+                <!-- Facture actuellement liée -->
+                <div id="current_supplier_invoice" style="margin-bottom: 15px;">
+                    <div id="current_invoice_info"></div>
+                </div>
+                
+                <!-- Sélection d'une nouvelle facture -->
+                <div style="margin-bottom: 10px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Lier à une facture fournisseur:</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="supplier_invoice_select" style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                            <option value="">Sélectionner une facture...</option>
+                        </select>
+                        <button type="button" onclick="linkSupplierInvoice()" style="background: #007cba; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;"><?php print img_picto('', 'link'); ?> Lier</button>
+                    </div>
+                </div>
+                
+                <!-- Documents de la facture liée -->
+                <div id="supplier_invoice_documents" style="margin-top: 15px;">
+                    <div id="invoice_documents_list"></div>
+                </div>
+                
+                <!-- Messages -->
+                <div id="invoice_messages" style="margin-top: 10px;"></div>
+            </div>
+            
+            </form>
+        </div>
+        
+        <!-- Pied de page fixe avec boutons -->
+        <div style="padding: 15px 20px; border-top: 1px solid #ddd; background: #f8f9fa; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
+            <button type="button" onclick="deleteTransactionFromModal()" id="modal_delete_btn" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">🗑️ Supprimer</button>
+            <div>
+                <button type="button" onclick="closeEditModal()" id="modal_close_btn" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 4px; margin-right: 10px; cursor: pointer;">Fermer</button>
+                <button type="submit" form="editTransactionForm" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">Sauvegarder</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal d'édition de contrat -->
+<div id="contractEditModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div style="background-color: white; margin: 2% auto; border-radius: 8px; width: 90%; max-width: 800px; height: 90%; max-height: 700px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); display: flex; flex-direction: column;">
+        
+        <!-- En-tête fixe -->
+        <div style="padding: 20px 20px 15px 20px; border-bottom: 1px solid #ddd; flex-shrink: 0;">
+            <h3 style="margin: 0; color: #007cba;">Éditer le contrat</h3>
+        </div>
+        
+        <!-- Zone de contenu avec scrollbar -->
+        <div style="flex: 1; overflow-y: auto; padding: 20px;">
+            <form id="contractEditForm" method="POST" action="contract_card_complete.php">
+                <input type="hidden" name="action" value="update">
+                <input type="hidden" name="id" id="contract_edit_id">
+                <input type="hidden" name="token" value="<?php echo newToken(); ?>">
+                
+                <!-- Zone de chargement -->
+                <div id="contract_loading" style="text-align: center; padding: 40px; display: none;">
+                    <div style="font-size: 2em; margin-bottom: 10px;"></div>
+                    <div>Chargement des données du contrat...</div>
+                </div>
+                
+                <!-- Formulaire d'édition -->
+                <div id="contract_form_content" style="display: none;">
+                    
+                    <!-- Informations générales -->
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                        <h4 style="margin: 0 0 15px 0;"> Informations Générales</h4>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Collaborateur:</label>
+                            <select name="fk_collaborator" id="contract_collaborator" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" required>
+                                <option value="">-- Sélectionner un collaborateur --</option>
+                            </select>
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Réf. client:</label>
+                            <input type="text" name="label" id="contract_label" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" required>
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Date de création:</label>
+                            <input type="date" name="date_creation" id="contract_date_creation" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                        </div>
+                    </div>
+                    
+                    <!-- Montants -->
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                        <h4 style="margin: 0 0 15px 0;">Montants</h4>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div>
+                                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Montant HT (€):</label>
+                                <input type="number" name="amount_ht" id="contract_amount_ht" step="0.01" min="0" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" required>
+                            </div>
+                            
+                            <div>
+                                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Montant TTC (€):</label>
+                                <input type="number" name="amount_ttc" id="contract_amount_ttc" step="0.01" min="0" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 15px;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                <div>
+                                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Pourcentage (%):</label>
+                                    <input type="number" name="percentage" id="contract_percentage" step="0.01" min="0" max="100" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                                </div>
+                                
+                                <div>
+                                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Montant commission (€):</label>
+                                    <input type="number" name="commission_amount" id="contract_commission_amount" step="0.01" min="0" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" readonly>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Liaison documents -->
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                        <h4 style="margin: 0 0 15px 0;">Liaison Documents</h4>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Facture liée:</label>
+                            <div id="contract_facture_info" style="padding: 8px; border: 1px solid #e9ecef; border-radius: 4px; background: white; min-height: 20px;">
+                                <span style="color: #666; font-style: italic;">Aucune facture liée</span>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Devis lié:</label>
+                            <div id="contract_propal_info" style="padding: 8px; border: 1px solid #e9ecef; border-radius: 4px; background: white; min-height: 20px;">
+                                <span style="color: #666; font-style: italic;">Aucun devis lié</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Messages -->
+                    <div id="contract_messages" style="margin-top: 15px;"></div>
+                    
+                </div>
+                
+            </form>
+        </div>
+        
+        <!-- Pied de page fixe avec boutons -->
+        <div style="padding: 15px 20px; border-top: 1px solid #ddd; background: #f8f9fa; flex-shrink: 0; text-align: right;">
+            <button type="button" onclick="closeContractEditModal()" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 4px; margin-right: 10px; cursor: pointer;">Fermer</button>
+            <button type="submit" form="contractEditForm" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">Sauvegarder</button>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+</style>
+
+<script>
+// Variables globales
+const typeLabels = <?php echo json_encode($type_labels_js); ?>;
+let currentTransactionId = null;
+
+// Fonction pour ouvrir le modal d'édition
+function openEditModal(transactionId, amount, description, note, type) {
+    currentTransactionId = transactionId;
+    
+    document.getElementById('edit_transaction_id').value = transactionId;
+    document.getElementById('edit_amount').value = amount;
+    document.getElementById('edit_description').value = description;
+    document.getElementById('edit_note_private').value = note || '';
+    document.getElementById('edit_transaction_type').value = type;
+    
+    // Charger le libellé de la transaction
+    loadTransactionLabel(transactionId);
+    
+    // Déterminer quelles sections afficher selon le type
+    toggleTransactionSectionsInModal(type);
+    
+    // Charger les informations selon le type de transaction
+    if (isCreditType(type)) {
+        // Charger les informations de contrat pour les crédits
+        loadCurrentContract(transactionId);
+        loadAvailableContracts();
+    } else if (isDebitType(type)) {
+        // Charger les informations de facture fournisseur pour les débits
+        loadCurrentSupplierInvoice(transactionId);
+        loadAvailableSupplierInvoices();
+    }
+    
+    document.getElementById('editTransactionModal').style.display = 'block';
+}
+
+// Fonction pour vérifier si un type est un débit
+function isDebitType(type) {
+    const debitTypes = ['advance', 'fee', 'refund', 'adjustment', 'salary', 'other_debit'];
+    return debitTypes.includes(type);
+}
+
+// Fonction pour vérifier si un type est un crédit
+function isCreditType(type) {
+    const creditTypes = ['contract', 'commission', 'bonus', 'interest', 'other_credit'];
+    return creditTypes.includes(type);
+}
+
+// Fonction pour afficher/masquer les sections selon le type dans la modal
+function toggleTransactionSectionsInModal(type) {
+    const contractSection = document.getElementById('contract_section_modal');
+    const supplierSection = document.getElementById('supplier_invoice_section_modal');
+    
+    if (isCreditType(type)) {
+        // Afficher section contrat/facture client pour les crédits
+        contractSection.style.display = 'block';
+        supplierSection.style.display = 'none';
+    } else if (isDebitType(type)) {
+        // Afficher section facture fournisseur pour les débits
+        contractSection.style.display = 'none';
+        supplierSection.style.display = 'block';
+    } else {
+        // Masquer les deux sections
+        contractSection.style.display = 'none';
+        supplierSection.style.display = 'none';
+    }
+}
+
+// Event listener pour le changement de type de transaction dans la modal
+document.addEventListener('DOMContentLoaded', function() {
+    const typeSelect = document.getElementById('edit_transaction_type');
+    if (typeSelect) {
+        typeSelect.addEventListener('change', function() {
+            toggleTransactionSectionsInModal(this.value);
+            
+            // Charger les données appropriées selon le nouveau type
+            if (isCreditType(this.value)) {
+                loadCurrentContract(currentTransactionId);
+                loadAvailableContracts();
+            } else if (isDebitType(this.value)) {
+                loadCurrentSupplierInvoice(currentTransactionId);
+                loadAvailableSupplierInvoices();
+            }
+        });
+    }
+});
+
+// Fonction pour charger le libellé d'une transaction
+function loadTransactionLabel(transactionId) {
+    fetch('get_transaction_info.php?transaction_id=' + transactionId)
+        .then(response => response.json())
+        .then(data => {
+            const labelDiv = document.getElementById('edit_label_display');
+            const actionsDiv = document.getElementById('edit_label_actions');
+            
+            if (data.success && data.label) {
+                let labelHtml = '';
+                let linkUrl = '';
+                
+                if (data.label_type === 'contract') {
+                    labelHtml = '<span style="color: #007cba; font-weight: 500;">' + data.label + '</span>';
+                    linkUrl = 'contract_card_complete.php?id=' + data.contract_id;
+                } else if (data.label_type === 'supplier_invoice') {
+                    labelHtml = '<span style="color: #fd7e14; font-weight: 500;"> ' + data.label + '</span>';
+                    linkUrl = 'contract_card_complete.php';
+                } else if (data.label_type === 'customer_invoice') {
+                    labelHtml = '<span style="color: #28a745; font-weight: 500;"> ' + data.label + '</span>';
+                    linkUrl = 'contract_card_complete.php';
+                }
+                
+                // Rendre le libellé cliquable avec options de modification
+                labelDiv.innerHTML = labelHtml + 
+                    '<div style="float: right; display: flex; gap: 5px;">' +
+                    '<button type="button" onclick="openContractEditModal(' + data.contract_id + ')" style="background: #28a745; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.8em;" title="Modifier dans une fenêtre">Modal</button>' +
+                    '<a href="' + linkUrl + '" target="_blank" style="background: #007cba; color: white; text-decoration: none; padding: 4px 8px; border-radius: 3px; font-size: 0.8em;" title="Modifier via contract_card_complete.php"> Page</a>' +
+                    '</div>';
+                labelDiv.style.fontStyle = 'normal';
+                labelDiv.style.color = '#333';
+                labelDiv.style.cursor = 'default';
+                
+                // Afficher les actions
+                actionsDiv.style.display = 'block';
+                actionsDiv.innerHTML = '<small style="color: #007cba;"><em>Utilisez "Modal" pour éditer rapidement ou "Page" pour ouvrir contract_card_complete.php</em></small>';
+                
+            } else {
+                labelDiv.innerHTML = 'Aucun libellé (transaction non liée)';
+                labelDiv.style.fontStyle = 'italic';
+                labelDiv.style.color = '#666';
+                labelDiv.style.cursor = 'default';
+                actionsDiv.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Erreur lors du chargement du libellé:', error);
+            document.getElementById('edit_label_display').innerHTML = 'Erreur de chargement';
+            document.getElementById('edit_label_actions').style.display = 'none';
+        });
+}
+
+// Fonction pour fermer le modal d'édition
+function closeEditModal() {
+    document.getElementById('editTransactionModal').style.display = 'none';
+}
+
+// Fonction pour supprimer la transaction depuis la modale
+function deleteTransactionFromModal() {
+    if (!currentTransactionId) {
+        alert('Erreur: ID de transaction non trouvé');
+        return;
+    }
+
+    const collaboratorId = <?php echo $displayed_collaborator_id; ?>;
+
+    if (confirm('Êtes-vous sûr de vouloir supprimer cette transaction ?\n\nCette action ne peut pas être annulée.')) {
+        // Fermer la modale
+        closeEditModal();
+
+        // Soumettre la suppression
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'edit_transaction.php';
+
+        const fields = {
+            'action': 'delete',
+            'transaction_id': currentTransactionId,
+            'collaborator_id': collaboratorId,
+            'token': '<?php echo newToken(); ?>'
+        };
+
+        for (const key in fields) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = fields[key];
+            form.appendChild(input);
+        }
+
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// Fonction pour confirmer la suppression
+function confirmDeleteTransaction(transactionId, collaboratorId) {
+    if (confirm('Êtes-vous sûr de vouloir supprimer cette transaction ?\n\nCette action ne peut pas être annulée.')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'edit_transaction.php';
+        
+        const fields = {
+            'action': 'delete',
+            'transaction_id': transactionId,
+            'collaborator_id': collaboratorId,
+            'token': '<?php echo newToken(); ?>'
+        };
+        
+        for (const key in fields) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = fields[key];
+            form.appendChild(input);
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// Event listeners pour les boutons d'édition
+document.addEventListener('DOMContentLoaded', function() {
+    // Boutons d'édition
+    const editButtons = document.querySelectorAll('.btn-edit-transaction');
+    editButtons.forEach(function(button) {
+        button.addEventListener('click', function() {
+            const transactionId = this.getAttribute('data-transaction-id');
+            const amount = this.getAttribute('data-amount');
+            const description = this.getAttribute('data-description');
+            const note = this.getAttribute('data-note');
+            const type = this.getAttribute('data-type');
+            
+            openEditModal(transactionId, amount, description, note, type);
+        });
+    });
+    
+    // Fermer le modal en cliquant en dehors
+    const modal = document.getElementById('editTransactionModal');
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            closeEditModal();
+        }
+    });
+    
+    // Fermer le modal avec la touche Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeEditModal();
+        }
+    });
+});
+
+// ========== FONCTIONS POUR LA GESTION DES FACTURES FOURNISSEURS ==========
+
+// Fonction pour charger la facture fournisseur actuelle
+function loadCurrentSupplierInvoice(transactionId) {
+    const currentInvoiceDiv = document.getElementById('current_invoice_info');
+    currentInvoiceDiv.innerHTML = '<div style="color: #666; font-style: italic;">Chargement...</div>';
+    
+    fetch('supplier_invoice_link.php?action=get_current_invoice&transaction_id=' + transactionId)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayCurrentInvoice(data);
+            } else {
+                currentInvoiceDiv.innerHTML = '<div style="color: red;">Erreur: ' + data.error + '</div>';
+            }
+        })
+        .catch(error => {
+            currentInvoiceDiv.innerHTML = '<div style="color: red;">Erreur de communication</div>';
+        });
+}
+
+// Fonction pour afficher la facture fournisseur actuelle
+function displayCurrentInvoice(data) {
+    const currentInvoiceDiv = document.getElementById('current_invoice_info');
+    
+    if (!data.has_invoice) {
+        currentInvoiceDiv.innerHTML = '<div style="color: #666; font-style: italic; padding: 10px; background: #f8f9fa; border-radius: 4px;">Aucune facture fournisseur liée</div>';
+        document.getElementById('invoice_documents_list').innerHTML = '';
+        return;
+    }
+    
+    const invoice = data.invoice;
+    let html = '<div style="border: 1px solid #007cba; border-radius: 4px; padding: 12px; background: #f0f8ff;">';
+    html += '<div style="display: flex; justify-content: space-between; align-items: start;">';
+    html += '<div>';
+    html += '<div style="font-weight: bold; color: #007cba;"> ' + escapeHtml(invoice.ref) + '</div>';
+    html += '<div style="margin: 5px 0;">' + escapeHtml(invoice.supplier_name) + '</div>';
+    if (invoice.libelle) {
+        html += '<div style="font-style: italic; color: #666;">' + escapeHtml(invoice.libelle) + '</div>';
+    }
+    html += '<div style="margin-top: 5px;"><strong>' + parseFloat(invoice.total_ht).toFixed(2) + ' €</strong> - ' + formatDate(invoice.date) + '</div>';
+    html += '</div>';
+    html += '<button type="button" onclick="unlinkSupplierInvoice()" style="background: #dc3545; color: white; border: none; padding: 6px 10px; border-radius: 3px; cursor: pointer;" title="Délier cette facture"></button>';
+    html += '</div>';
+    html += '</div>';
+    
+    currentInvoiceDiv.innerHTML = html;
+    
+    // Charger les documents de cette facture
+    loadInvoiceDocuments(invoice.id);
+}
+
+// Fonction pour charger les factures fournisseurs disponibles
+function loadAvailableSupplierInvoices() {
+    const select = document.getElementById('supplier_invoice_select');
+    
+    fetch('supplier_invoice_link.php?action=get_available_invoices')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                populateInvoiceSelect(data.invoices);
+            } else {
+                console.error('Erreur lors du chargement des factures:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur de communication:', error);
+        });
+}
+
+// Fonction pour remplir le select des factures
+function populateInvoiceSelect(invoices) {
+    const select = document.getElementById('supplier_invoice_select');
+    select.innerHTML = '<option value="">Sélectionner une facture...</option>';
+    
+    invoices.forEach(function(invoice) {
+        const option = document.createElement('option');
+        option.value = invoice.id;
+        
+        const statusIcon = invoice.paye ? '' : '';
+        const libelle = invoice.libelle ? ' - ' + invoice.libelle.substring(0, 30) : '';
+        option.textContent = statusIcon + ' ' + invoice.ref + ' (' + invoice.supplier_name + ')' + libelle + ' - ' + parseFloat(invoice.total_ht).toFixed(2) + '€';
+        
+        select.appendChild(option);
+    });
+}
+
+// Fonction pour lier une facture fournisseur
+function linkSupplierInvoice() {
+    const select = document.getElementById('supplier_invoice_select');
+    const supplierInvoiceId = select.value;
+    
+    if (!supplierInvoiceId) {
+        showInvoiceMessage('Veuillez sélectionner une facture', 'error');
+        return;
+    }
+    
+    if (!currentTransactionId) {
+        showInvoiceMessage('Erreur: ID de transaction manquant', 'error');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('action', 'link_invoice');
+    formData.append('transaction_id', currentTransactionId);
+    formData.append('supplier_invoice_id', supplierInvoiceId);
+    formData.append('token', '<?php echo newToken(); ?>');
+    
+    showInvoiceMessage('Liaison en cours...', 'info');
+    
+    fetch('supplier_invoice_link.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showInvoiceMessage(data.message, 'success');
+            select.value = ''; // Réinitialiser le select
+            loadCurrentSupplierInvoice(currentTransactionId); // Recharger l'affichage
+        } else {
+            showInvoiceMessage('Erreur: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showInvoiceMessage('Erreur de communication', 'error');
+    });
+}
+
+// Fonction pour délier une facture fournisseur
+function unlinkSupplierInvoice() {
+    if (!confirm('Êtes-vous sûr de vouloir délier cette facture fournisseur de la transaction ?')) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('action', 'unlink_invoice');
+    formData.append('transaction_id', currentTransactionId);
+    formData.append('token', '<?php echo newToken(); ?>');
+    
+    fetch('supplier_invoice_link.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showInvoiceMessage(data.message + ' - Vous pouvez maintenant fermer cette fenêtre.', 'success');
+            loadCurrentSupplierInvoice(currentTransactionId); // Recharger l'affichage
+            
+            // Mettre en évidence le bouton Fermer
+            const closeBtn = document.getElementById('modal_close_btn');
+            if (closeBtn) {
+                closeBtn.style.background = '#28a745';
+                closeBtn.style.animation = 'pulse 2s infinite';
+                closeBtn.innerHTML = 'Fermer (Liaison supprimée)';
+            }
+            
+            // Rafraîchir la page après 3 secondes pour voir les changements dans le tableau
+            setTimeout(function() {
+                if (confirm('La liaison a été supprimée avec succès. Voulez-vous rafraîchir la page pour voir les modifications dans le tableau ?')) {
+                    window.location.reload();
+                }
+            }, 3000);
+        } else {
+            showInvoiceMessage('Erreur: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showInvoiceMessage('Erreur de communication', 'error');
+    });
+}
+
+// Fonction pour charger les documents d'une facture
+function loadInvoiceDocuments(invoiceId) {
+    const documentsDiv = document.getElementById('invoice_documents_list');
+    documentsDiv.innerHTML = '<div style="color: #666; font-style: italic;">Chargement des documents...</div>';
+    
+    fetch('supplier_invoice_link.php?action=get_invoice_documents&supplier_invoice_id=' + invoiceId)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayInvoiceDocuments(data.documents);
+            } else {
+                documentsDiv.innerHTML = '<div style="color: red;">Erreur: ' + data.error + '</div>';
+            }
+        })
+        .catch(error => {
+            documentsDiv.innerHTML = '<div style="color: red;">Erreur de communication</div>';
+        });
+}
+
+// Fonction pour afficher les documents de la facture
+function displayInvoiceDocuments(documents) {
+    const documentsDiv = document.getElementById('invoice_documents_list');
+    
+    if (documents.length === 0) {
+        documentsDiv.innerHTML = '<div style="color: #666; font-style: italic; padding: 8px;">Aucun document attaché à cette facture</div>';
+        return;
+    }
+    
+    let html = '<div style="margin-top: 10px;"><h5 style="margin: 0 0 8px 0; color: #007cba;">📎 Documents de la facture:</h5>';
+    html += '<div style="border: 1px solid #ddd; border-radius: 4px; max-height: 120px; overflow-y: auto;">';
+    
+    documents.forEach(function(doc) {
+        const fileIcon = getFileIcon(doc.name);
+        html += '<div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-bottom: 1px solid #eee;">';
+        html += '<div style="display: flex; align-items: center; gap: 6px;">';
+        html += '<span style="font-size: 1.1em;">' + fileIcon + '</span>';
+        html += '<div>';
+        html += '<div style="font-weight: bold; font-size: 0.9em;">' + escapeHtml(doc.name) + '</div>';
+        html += '<small style="color: #666;">' + doc.size + ' - ' + doc.date + '</small>';
+        html += '</div>';
+        html += '</div>';
+        html += '<a href="' + doc.url + '" target="_blank" style="background: #007cba; color: white; text-decoration: none; padding: 4px 8px; border-radius: 3px; font-size: 0.8em;" title="Voir le document"></a>';
+        html += '</div>';
+    });
+    
+    html += '</div></div>';
+    documentsDiv.innerHTML = html;
+}
+
+// Fonction pour obtenir l'icône selon le type de fichier
+function getFileIcon(filename) {
+    const extension = filename.split('.').pop().toLowerCase();
+    
+    switch (extension) {
+        case 'pdf': return '';
+        case 'jpg':
+        case 'jpeg':
+        case 'png':
+        case 'gif': return '🖼️';
+        case 'doc':
+        case 'docx': return '';
+        case 'xls':
+        case 'xlsx': return '';
+        case 'txt': return '';
+        default: return '📎';
+    }
+}
+
+// Fonction pour afficher les messages
+function showInvoiceMessage(message, type) {
+    const messagesDiv = document.getElementById('invoice_messages');
+    
+    let bgColor, textColor;
+    switch (type) {
+        case 'success':
+            bgColor = '#d4edda';
+            textColor = '#155724';
+            break;
+        case 'error':
+            bgColor = '#f8d7da';
+            textColor = '#721c24';
+            break;
+        case 'info':
+            bgColor = '#d1ecf1';
+            textColor = '#0c5460';
+            break;
+        default:
+            bgColor = '#f8f9fa';
+            textColor = '#495057';
+    }
+    
+    messagesDiv.innerHTML = '<div style="background: ' + bgColor + '; color: ' + textColor + '; padding: 8px; border-radius: 4px;">' + escapeHtml(message) + '</div>';
+    
+    // Effacer le message après 5 secondes pour les succès/info
+    if (type === 'success' || type === 'info') {
+        setTimeout(() => {
+            messagesDiv.innerHTML = '';
+        }, 5000);
+    }
+}
+
+// Fonctions utilitaires
+function formatDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('fr-FR');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ========== FONCTIONS POUR LA GESTION DES CONTRATS DANS LA MODAL TRANSACTION ==========
+
+let currentContractId = null;
+
+// Fonction pour charger le contrat actuellement lié à la transaction
+function loadCurrentContract(transactionId) {
+    fetch('get_transaction_info.php?transaction_id=' + transactionId)
+        .then(response => response.json())
+        .then(data => {
+            const contractInfoDiv = document.getElementById('current_contract_info');
+            
+            if (data.success && data.label_type === 'contract' && data.contract_id) {
+                currentContractId = data.contract_id;
+                
+                let html = '<div style="background: #e3f2fd; border: 1px solid #007cba; border-radius: 4px; padding: 10px;">';
+                html += '<strong>Contrat lié:</strong> ' + escapeHtml(data.label);
+                
+                if (data.facture_info) {
+                    html += '<br><strong> Facture client:</strong> ' + escapeHtml(data.facture_info.ref);
+                    html += ' - ' + escapeHtml(data.facture_info.client);
+                    html += ' (' + parseFloat(data.facture_info.amount).toFixed(2) + ' €)';
+                }
+                
+                html += '</div>';
+                contractInfoDiv.innerHTML = html;
+            } else {
+                currentContractId = null;
+                contractInfoDiv.innerHTML = '<div style="color: #666; font-style: italic;">Aucun contrat lié à cette transaction</div>';
+            }
+        })
+        .catch(error => {
+            document.getElementById('current_contract_info').innerHTML = '<div style="color: red;">Erreur lors du chargement du contrat</div>';
+            console.error('Erreur:', error);
+        });
+}
+
+// Fonction pour charger la liste des contrats disponibles
+function loadAvailableContracts() {
+    const select = document.getElementById('contract_select');
+    select.innerHTML = '<option value="">Sélectionner un contrat...</option>';
+    
+    fetch('get_available_contracts.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.contracts) {
+                data.contracts.forEach(function(contract) {
+                    const option = document.createElement('option');
+                    option.value = contract.id;
+                    option.textContent = contract.label + ' (' + parseFloat(contract.amount_ht).toFixed(2) + ' € - ' + contract.collaborator + ')';
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Erreur lors du chargement des contrats:', error);
+        });
+}
+
+// Fonction pour obtenir l'ID du contrat depuis la transaction courante
+function getContractIdFromTransaction() {
+    return currentContractId;
+}
+
+// Fonction d'édition du contrat avec fallback
+function editContractWithFallback() {
+    const contractId = getContractIdFromTransaction();
+    
+    if (!contractId) {
+        showContractTransactionMessage('Aucun contrat lié à éditer', 'error');
+        return;
+    }
+    
+    // Essayer d'ouvrir la modal d'édition de contrat
+    try {
+        if (typeof openContractEditModal === 'function') {
+            openContractEditModal(contractId);
+        } else {
+            // Fallback vers la page contract_card_complete.php
+            redirectToContractPage(contractId);
+        }
+    } catch (error) {
+        console.error('Erreur lors de l\'ouverture de la modal:', error);
+        // Fallback vers la page contract_card_complete.php
+        redirectToContractPage(contractId);
+    }
+}
+
+// Fonction de redirection vers contract_card_complete.php
+function redirectToContractPage(contractId) {
+    if (contractId) {
+        window.open('contract_card_complete.php?id=' + contractId + '&action=edit', '_blank');
+    } else {
+        showContractTransactionMessage('ID du contrat manquant', 'error');
+    }
+}
+
+// Fonction pour lier un contrat à la transaction
+function linkContract() {
+    const contractId = document.getElementById('contract_select').value;
+    
+    if (!contractId) {
+        showContractTransactionMessage('Veuillez sélectionner un contrat', 'error');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('action', 'link_contract');
+    formData.append('transaction_id', currentTransactionId);
+    formData.append('contract_id', contractId);
+    formData.append('token', '<?php echo newToken(); ?>');
+    
+    fetch('manage_transaction_links.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showContractTransactionMessage(data.message, 'success');
+            loadCurrentContract(currentTransactionId);
+            loadTransactionLabel(currentTransactionId);
+        } else {
+            showContractTransactionMessage('Erreur: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showContractTransactionMessage('Erreur de communication', 'error');
+        console.error('Erreur:', error);
+    });
+}
+
+// Fonction pour délier un contrat de la transaction
+function unlinkContract() {
+    if (!currentContractId) {
+        showContractTransactionMessage('Aucun contrat à délier', 'error');
+        return;
+    }
+    
+    if (!confirm('Êtes-vous sûr de vouloir délier ce contrat de la transaction ?')) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('action', 'unlink_contract');
+    formData.append('transaction_id', currentTransactionId);
+    formData.append('token', '<?php echo newToken(); ?>');
+    
+    fetch('manage_transaction_links.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showContractTransactionMessage(data.message, 'success');
+            loadCurrentContract(currentTransactionId);
+            loadTransactionLabel(currentTransactionId);
+        } else {
+            showContractTransactionMessage('Erreur: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showContractTransactionMessage('Erreur de communication', 'error');
+        console.error('Erreur:', error);
+    });
+}
+
+// Fonction pour afficher les messages dans la section contrat de la modal transaction
+function showContractTransactionMessage(message, type) {
+    const messagesDiv = document.getElementById('contract_transaction_messages');
+    
+    let bgColor, textColor;
+    switch (type) {
+        case 'success':
+            bgColor = '#d4edda';
+            textColor = '#155724';
+            break;
+        case 'error':
+            bgColor = '#f8d7da';
+            textColor = '#721c24';
+            break;
+        default:
+            bgColor = '#f8f9fa';
+            textColor = '#495057';
+    }
+    
+    messagesDiv.innerHTML = '<div style="background: ' + bgColor + '; color: ' + textColor + '; padding: 8px; border-radius: 4px; margin-bottom: 10px;">' + escapeHtml(message) + '</div>';
+    
+    // Effacer le message après 3 secondes
+    setTimeout(() => {
+        messagesDiv.innerHTML = '';
+    }, 3000);
+}
+
+// ========== FONCTIONS POUR LA MODAL D'ÉDITION DE CONTRAT ==========
+
+// Fonction pour ouvrir la modal d'édition de contrat
+function openContractEditModal(contractId) {
+    if (!contractId) {
+        showContractMessage('Erreur: ID du contrat manquant', 'error');
+        return;
+    }
+    
+    document.getElementById('contractEditModal').style.display = 'block';
+    document.getElementById('contract_edit_id').value = contractId;
+    
+    // Charger les données du contrat
+    loadContractData(contractId);
+}
+
+// Fonction pour fermer la modal d'édition de contrat
+function closeContractEditModal() {
+    document.getElementById('contractEditModal').style.display = 'none';
+    document.getElementById('contract_form_content').style.display = 'none';
+    document.getElementById('contract_loading').style.display = 'none';
+}
+
+// Fonction pour charger les données du contrat
+function loadContractData(contractId) {
+    const loadingDiv = document.getElementById('contract_loading');
+    const formDiv = document.getElementById('contract_form_content');
+    
+    loadingDiv.style.display = 'block';
+    formDiv.style.display = 'none';
+    
+    // Charger d'abord les collaborateurs
+    loadCollaborators();
+    
+    // Charger les données du contrat via AJAX
+    fetch('get_contract_data.php?id=' + contractId)
+        .then(response => response.json())
+        .then(data => {
+            loadingDiv.style.display = 'none';
+            
+            if (data.success) {
+                populateContractForm(data.contract);
+                formDiv.style.display = 'block';
+            } else {
+                showContractMessage('Erreur: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            loadingDiv.style.display = 'none';
+            showContractMessage('Erreur de communication', 'error');
+            console.error('Erreur:', error);
+        });
+}
+
+// Fonction pour charger la liste des collaborateurs
+function loadCollaborators() {
+    const select = document.getElementById('contract_collaborator');
+    select.innerHTML = '<option value="">-- Sélectionner un collaborateur --</option>';
+    
+    // On peut réutiliser la même logique que dans contract_card_complete.php
+    fetch('get_collaborators.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.collaborators) {
+                data.collaborators.forEach(function(collab) {
+                    const option = document.createElement('option');
+                    option.value = collab.id;
+                    option.textContent = collab.label + ' (' + collab.default_percentage + '% - ' + collab.cost_per_session + '/séance)';
+                    option.setAttribute('data-percentage', collab.default_percentage);
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Erreur lors du chargement des collaborateurs:', error);
+        });
+}
+
+// Fonction pour remplir le formulaire avec les données du contrat
+function populateContractForm(contract) {
+    document.getElementById('contract_collaborator').value = contract.fk_collaborator || '';
+    document.getElementById('contract_label').value = contract.label || '';
+    document.getElementById('contract_date_creation').value = contract.date_creation || '';
+    document.getElementById('contract_amount_ht').value = contract.amount_ht || '';
+    document.getElementById('contract_amount_ttc').value = contract.amount_ttc || '';
+    document.getElementById('contract_percentage').value = contract.percentage || '';
+    document.getElementById('contract_commission_amount').value = contract.commission_amount || '';
+    
+    // Afficher les informations de facture liée
+    const factureDiv = document.getElementById('contract_facture_info');
+    if (contract.facture_ref) {
+        factureDiv.innerHTML = '<strong> ' + escapeHtml(contract.facture_ref) + '</strong><br>' +
+                               '<span style="color: #666;">' + escapeHtml(contract.facture_client || '') + '</span><br>' +
+                               '<span style="color: #28a745;">' + parseFloat(contract.facture_amount || 0).toFixed(2) + ' €</span>';
+    } else {
+        factureDiv.innerHTML = '<span style="color: #666; font-style: italic;">Aucune facture liée</span>';
+    }
+    
+    // Afficher les informations de devis lié
+    const propalDiv = document.getElementById('contract_propal_info');
+    if (contract.propal_ref) {
+        propalDiv.innerHTML = '<strong>' + escapeHtml(contract.propal_ref) + '</strong><br>' +
+                              '<span style="color: #666;">' + escapeHtml(contract.propal_client || '') + '</span><br>' +
+                              '<span style="color: #007cba;">' + parseFloat(contract.propal_amount || 0).toFixed(2) + ' €</span>';
+    } else {
+        propalDiv.innerHTML = '<span style="color: #666; font-style: italic;">Aucun devis lié</span>';
+    }
+    
+    // Calculer la commission si nécessaire
+    calculateCommission();
+}
+
+// Fonction pour calculer la commission automatiquement
+function calculateCommission() {
+    const amountHT = parseFloat(document.getElementById('contract_amount_ht').value) || 0;
+    const percentage = parseFloat(document.getElementById('contract_percentage').value) || 0;
+    
+    if (amountHT > 0 && percentage > 0) {
+        const commission = (amountHT * percentage) / 100;
+        document.getElementById('contract_commission_amount').value = commission.toFixed(2);
+    }
+}
+
+// Fonction pour afficher les messages dans la modal de contrat
+function showContractMessage(message, type) {
+    const messagesDiv = document.getElementById('contract_messages');
+    
+    let bgColor, textColor;
+    switch (type) {
+        case 'success':
+            bgColor = '#d4edda';
+            textColor = '#155724';
+            break;
+        case 'error':
+            bgColor = '#f8d7da';
+            textColor = '#721c24';
+            break;
+        case 'info':
+            bgColor = '#d1ecf1';
+            textColor = '#0c5460';
+            break;
+        default:
+            bgColor = '#f8f9fa';
+            textColor = '#495057';
+    }
+    
+    messagesDiv.innerHTML = '<div style="background: ' + bgColor + '; color: ' + textColor + '; padding: 8px; border-radius: 4px; margin-bottom: 15px;">' + escapeHtml(message) + '</div>';
+    
+    // Effacer le message après 5 secondes pour les succès/info
+    if (type === 'success' || type === 'info') {
+        setTimeout(() => {
+            messagesDiv.innerHTML = '';
+        }, 5000);
+    }
+}
+
+// Event listeners pour la modal de contrat
+document.addEventListener('DOMContentLoaded', function() {
+    // Fermer la modal en cliquant en dehors
+    const contractModal = document.getElementById('contractEditModal');
+    if (contractModal) {
+        contractModal.addEventListener('click', function(e) {
+            if (e.target === contractModal) {
+                closeContractEditModal();
+            }
+        });
+    }
+    
+    // Calcul automatique de la commission
+    const amountInput = document.getElementById('contract_amount_ht');
+    const percentageInput = document.getElementById('contract_percentage');
+    
+    if (amountInput) {
+        amountInput.addEventListener('input', calculateCommission);
+    }
+    if (percentageInput) {
+        percentageInput.addEventListener('input', calculateCommission);
+    }
+    
+    // Gestion de la soumission du formulaire
+    const contractForm = document.getElementById('contractEditForm');
+    if (contractForm) {
+        contractForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Soumettre le formulaire via AJAX pour rester dans la modal
+            const formData = new FormData(contractForm);
+            
+            fetch('contract_card_complete.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(data => {
+                // Analyser la réponse pour voir si c'est un succès
+                if (data.includes('Contrat modifié avec succès') || data.includes('mis à jour')) {
+                    showContractMessage('Contrat modifié avec succès ! La page va se rafraîchir.', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else if (data.includes('erreur') || data.includes('Erreur')) {
+                    showContractMessage('Erreur lors de la modification. Vérifiez les données saisies.', 'error');
+                } else {
+                    showContractMessage('Modification en cours...', 'info');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                }
+            })
+            .catch(error => {
+                showContractMessage('Erreur de communication', 'error');
+                console.error('Erreur:', error);
+            });
+        });
+    }
+});
+</script>
+
+<?php
+llxFooter();
+$db->close();
+?>
