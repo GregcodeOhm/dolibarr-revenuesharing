@@ -438,8 +438,8 @@ class ExportAccount
                 $current_month = date('Y-m', $trans_date);
                 $current_month_name = $month_names[(int)date('n', $trans_date)] . ' ' . date('Y', $trans_date);
 
-                // Afficher le séparateur de mois si changement détecté
-                if ($previous_month !== null && $previous_month !== $current_month) {
+                // Afficher le séparateur de mois (toujours afficher pour le premier, ensuite si changement détecté)
+                if ($previous_month === null || $previous_month !== $current_month) {
                     $pdf->SetFont('helvetica', 'B', 9);
                     $pdf->SetFillColor(240, 240, 240);
                     $pdf->Cell(190, 7, $current_month_name, 1, 1, 'L', true);

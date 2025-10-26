@@ -54,8 +54,8 @@ $num_trans = count($transactions);
                 $current_month = date('Y-m', $trans_date);
                 $current_month_name = $month_names[(int)date('n', $trans_date)] . ' ' . date('Y', $trans_date);
 
-                // Afficher le séparateur de mois si changement détecté
-                if ($previous_month !== null && $previous_month !== $current_month):
+                // Afficher le séparateur de mois (toujours afficher pour le premier, ensuite si changement détecté)
+                if ($previous_month === null || $previous_month !== $current_month):
             ?>
                 <tr class="liste_titre" style="background: #f0f0f0;">
                     <td colspan="8" style="padding: 8px; font-weight: bold; color: #666; border-top: 2px solid #ccc; border-bottom: 2px solid #ccc;">
