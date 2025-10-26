@@ -98,33 +98,87 @@ class ExportAccount
     }
     
     /**
-     * Charge les transactions avec filtres optionnels
+     * Charge les transactions avec filtres optionnels (incluant les salaires payés)
      */
     public function loadTransactions($filter_type = '', $filter_year = 0, $show_previsionnel = true, $limit = 500)
     {
-        $sql_trans = "SELECT t.*, c.ref as contract_ref, f.ref as facture_ref, f.datef as facture_date,
-                      ff.ref as facture_fourn_ref, ff.datef as facture_fourn_date, u.login as user_login,
-                      COALESCE(f.datef, ff.datef, t.transaction_date) as display_date
+        // Utiliser UNION pour combiner transactions et salaires
+        $sql_trans = "SELECT * FROM (
+            SELECT
+                t.rowid,
+                t.fk_collaborator,
+                t.transaction_type,
+                t.amount,
+                t.description,
+                t.label,
+                t.transaction_date,
+                t.date_creation,
+                t.status,
+                t.fk_contract,
+                t.fk_facture,
+                t.fk_facture_fourn,
+                t.fk_user_creat,
+                t.note_private,
+                c.ref as contract_ref,
+                f.ref as facture_ref,
+                f.datef as facture_date,
+                ff.ref as facture_fourn_ref,
+                ff.datef as facture_fourn_date,
+                u.login as user_login,
+                COALESCE(f.datef, ff.datef, t.transaction_date) as display_date
             FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
             LEFT JOIN ".MAIN_DB_PREFIX."revenuesharing_contract c ON c.rowid = t.fk_contract
-            LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture  
+            LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
             LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
             LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = t.fk_user_creat
-            WHERE t.fk_collaborator = ".$this->collaborator_id." AND t.status = 1";
+            WHERE t.fk_collaborator = ".$this->collaborator_id." AND t.status = 1"
+            .($filter_type && $filter_type !== 'salary' ? " AND t.transaction_type = '".$this->db->escape($filter_type)."'" : "")
+            .($filter_type === 'salary' ? " AND 1=0" : "")
+            .($filter_year ? " AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) = ".(int)$filter_year : "")
+            .(!$show_previsionnel ? " AND (c.type_contrat IS NULL OR c.type_contrat != 'previsionnel')" : "")."
 
-        if ($filter_type) {
-            $sql_trans .= " AND t.transaction_type = '".$this->db->escape($filter_type)."'";
-        }
-        if ($filter_year) {
-            $sql_trans .= " AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) = ".(int)$filter_year;
-        }
+            UNION ALL
 
-        // Filtrer les prévisionnels si nécessaire
-        if (!$show_previsionnel) {
-            $sql_trans .= " AND (c.type_contrat IS NULL OR c.type_contrat != 'previsionnel')";
-        }
-
-        $sql_trans .= " ORDER BY COALESCE(f.datef, ff.datef, t.transaction_date) DESC, t.date_creation DESC LIMIT ".(int)$limit;
+            SELECT
+                -sd.rowid as rowid,
+                sd.fk_collaborator,
+                'salary' as transaction_type,
+                -sd.solde_utilise as amount,
+                CONCAT('Salaire ',
+                    CASE sd.declaration_month
+                        WHEN 1 THEN 'Janvier' WHEN 2 THEN 'Février' WHEN 3 THEN 'Mars'
+                        WHEN 4 THEN 'Avril' WHEN 5 THEN 'Mai' WHEN 6 THEN 'Juin'
+                        WHEN 7 THEN 'Juillet' WHEN 8 THEN 'Août' WHEN 9 THEN 'Septembre'
+                        WHEN 10 THEN 'Octobre' WHEN 11 THEN 'Novembre' WHEN 12 THEN 'Décembre'
+                    END,
+                    ' ', sd.declaration_year,
+                    ' (', sd.total_days, ' jours)'
+                ) as description,
+                CONCAT('Déclaration #', sd.rowid) as label,
+                DATE(CONCAT(sd.declaration_year, '-', LPAD(sd.declaration_month, 2, '0'), '-01')) as transaction_date,
+                sd.date_creation,
+                sd.status,
+                NULL as fk_contract,
+                NULL as fk_facture,
+                NULL as fk_facture_fourn,
+                sd.fk_user_creat,
+                sd.note_private,
+                NULL as contract_ref,
+                NULL as facture_ref,
+                NULL as facture_date,
+                NULL as facture_fourn_ref,
+                NULL as facture_fourn_date,
+                u.login as user_login,
+                DATE(CONCAT(sd.declaration_year, '-', LPAD(sd.declaration_month, 2, '0'), '-01')) as display_date
+            FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration sd
+            LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = sd.fk_user_creat
+            WHERE sd.fk_collaborator = ".$this->collaborator_id."
+            AND sd.status = 3"
+            .($filter_year ? " AND sd.declaration_year = ".(int)$filter_year : "")
+            .($filter_type && $filter_type !== 'salary' ? " AND 1=0" : "")."
+        ) AS combined_transactions
+        ORDER BY display_date DESC, date_creation DESC
+        LIMIT ".(int)$limit;
 
         $resql_trans = $this->db->query($sql_trans);
         if ($resql_trans) {
@@ -163,19 +217,33 @@ class ExportAccount
         $previous_balance = 0;
         $filtered_count = count($this->transactions);
         
-        // Si filtre par année, calculer le solde reporté
+        // Si filtre par année, calculer le solde reporté (transactions + salaires)
         if ($filter_year > 0) {
+            // Transactions classiques
             $sql_previous = "SELECT COALESCE(SUM(t.amount), 0) as previous_balance
                 FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
                 LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
                 LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
                 WHERE t.fk_collaborator = ".$this->collaborator_id." AND t.status = 1
                 AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) < ".$filter_year;
-            
+
             $resql_previous = $this->db->query($sql_previous);
             if ($resql_previous) {
                 $previous_balance = $this->db->fetch_object($resql_previous)->previous_balance;
                 $this->db->free($resql_previous);
+            }
+
+            // Soustraire les salaires payés des années précédentes
+            $sql_previous_salaries = "SELECT COALESCE(SUM(solde_utilise), 0) as previous_salaries
+                FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration
+                WHERE fk_collaborator = ".$this->collaborator_id." AND status = 3
+                AND declaration_year < ".$filter_year;
+
+            $resql_previous_salaries = $this->db->query($sql_previous_salaries);
+            if ($resql_previous_salaries) {
+                $previous_salaries = $this->db->fetch_object($resql_previous_salaries)->previous_salaries;
+                $previous_balance -= $previous_salaries;
+                $this->db->free($resql_previous_salaries);
             }
         }
         
@@ -264,103 +332,69 @@ class ExportAccount
             $pdf->Cell(0, 6, $this->ca_info->nb_contrats, 0, 1);
             
         }
+
+        $pdf->Ln(5);
+
+        // === RÉSUMÉ FINANCIER ===
+        $pdf->SetX(10);
         
-        // Sauvegarder la position Y actuelle pour alignement
-        $start_y = $pdf->GetY();
-        
-        // === COLONNE GAUCHE : Répartition des montants (si existante) ===
-        $left_column_width = 95; // largeur de la colonne gauche
-        $right_column_x = 105;   // position X de la colonne droite
-        
-        if ($this->ca_info && ($this->ca_info->collaborator_total_ht > 0 || $this->ca_info->studio_total_ht > 0)) {
-            $pdf->SetFont('helvetica', 'B', 11);
-            $pdf->Cell($left_column_width, 6, 'RÉPARTITION DES MONTANTS', 0, 1);
-            $pdf->SetFont('helvetica', '', 10);
-            
-            $pdf->Cell(60, 6, 'Part Collaborateur:', 0, 0);
-            $pdf->Cell(35, 6, price($this->ca_info->collaborator_total_ht).' €', 0, 1);
-            
-            $pdf->Cell(60, 6, 'Part Structure:', 0, 0);
-            $pdf->Cell(35, 6, price($this->ca_info->studio_total_ht).' €', 0, 1);
-            
-            if ($this->ca_info->avg_percentage > 0) {
-                $pdf->Cell(60, 6, 'Pourcentage moyen:', 0, 0);
-                $pdf->Cell(35, 6, number_format($this->ca_info->avg_percentage, 1).'%', 0, 1);
-            }
-        }
-        
-        // === COLONNE DROITE : Résumé financier ===
-        // Positionner à droite, même hauteur que le début de la répartition
-        $pdf->SetXY($right_column_x, $start_y);
-        
-        $pdf->SetFont('helvetica', 'B', 11);
+        $pdf->SetFont('helvetica', 'B', 12);
         $resume_title = 'RÉSUMÉ FINANCIER';
         if ($filter_type || $filter_year) {
             $resume_title .= ' (FILTRÉ)';
         }
-        $pdf->Cell(95, 6, $resume_title, 0, 1);
-        $pdf->SetX($right_column_x);
+        $pdf->Cell(0, 8, $resume_title, 0, 1);
         $pdf->SetFont('helvetica', '', 10);
-        
+
         // Utiliser les données filtrées si des filtres sont appliqués, sinon les globales
         $display_balance = ($filter_type || $filter_year) ? $cumulative_balance : $this->balance_info->current_balance;
         $display_credits = ($filter_type || $filter_year) ? $filtered_credits : $this->balance_info->total_credits;
         $display_debits = ($filter_type || $filter_year) ? $filtered_debits : $this->balance_info->total_debits;
         $display_count = ($filter_type || $filter_year) ? $filtered_count : $this->balance_info->nb_transactions;
-        
+
         // Si filtré par année, afficher le solde reporté d'abord
         if ($filter_year > 0) {
-            $pdf->Cell(50, 6, 'Solde reporté:', 0, 0);
-            $pdf->Cell(45, 6, price($previous_balance).' €', 0, 1);
-            $pdf->SetX($right_column_x);
+            $pdf->Cell(60, 6, 'Solde reporté:', 0, 0);
+            $pdf->Cell(0, 6, price($previous_balance).' €', 0, 1);
         }
-        
+
         // Afficher les mouvements de l'année ou totaux
         if ($filter_year > 0) {
-            $pdf->Cell(50, 6, 'Crédits '.$filter_year.':', 0, 0);
-            $pdf->Cell(45, 6, price($display_credits).' €', 0, 1);
-            $pdf->SetX($right_column_x);
-            
-            $pdf->Cell(50, 6, 'Débits '.$filter_year.':', 0, 0);
-            $pdf->Cell(45, 6, price($display_debits).' €', 0, 1);
-            $pdf->SetX($right_column_x);
+            $pdf->Cell(60, 6, 'Crédits '.$filter_year.':', 0, 0);
+            $pdf->Cell(0, 6, price($display_credits).' €', 0, 1);
+
+            $pdf->Cell(60, 6, 'Débits '.$filter_year.':', 0, 0);
+            $pdf->Cell(0, 6, price($display_debits).' €', 0, 1);
         } else {
-            $pdf->Cell(50, 6, 'Total crédits:', 0, 0);
-            $pdf->Cell(45, 6, price($display_credits).' €', 0, 1);
-            $pdf->SetX($right_column_x);
-            
-            $pdf->Cell(50, 6, 'Total débits:', 0, 0);
-            $pdf->Cell(45, 6, price($display_debits).' €', 0, 1);
-            $pdf->SetX($right_column_x);
+            $pdf->Cell(60, 6, 'Total crédits:', 0, 0);
+            $pdf->Cell(0, 6, price($display_credits).' €', 0, 1);
+
+            $pdf->Cell(60, 6, 'Total débits:', 0, 0);
+            $pdf->Cell(0, 6, price($display_debits).' €', 0, 1);
         }
-        
-        $pdf->Cell(50, 6, 'Nb transactions:', 0, 0);
-        $pdf->Cell(45, 6, $display_count, 0, 1);
-        $pdf->SetX($right_column_x);
-        
+
+        $pdf->Cell(60, 6, 'Nb transactions:', 0, 0);
+        $pdf->Cell(0, 6, $display_count, 0, 1);
+
         // Solde cumulé en dernier, mis en évidence
-        $pdf->Cell(50, 6, 'Solde cumulé:', 0, 0);
+        $pdf->Cell(60, 6, 'Solde cumulé:', 0, 0);
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(45, 6, price($display_balance).' €', 0, 1);
+        $pdf->Cell(0, 6, price($display_balance).' €', 0, 1);
         $pdf->SetFont('helvetica', '', 10);
-        
+
         // Indication sur l'inclusion/exclusion des prévisionnels dans le solde
         if ($show_previsionnel) {
-            $pdf->SetX($right_column_x);
             $pdf->SetFont('helvetica', 'I', 8);
             $pdf->SetTextColor(0, 124, 186); // Couleur bleue #007cba
-            $pdf->Cell(95, 4, 'Inclut les contrats prévisionnels', 0, 1);
+            $pdf->Cell(0, 4, 'Inclut les contrats prévisionnels', 0, 1);
         } else {
-            $pdf->SetX($right_column_x);
             $pdf->SetFont('helvetica', 'I', 8);
             $pdf->SetTextColor(102, 102, 102); // Couleur grise #666
-            $pdf->Cell(95, 4, 'Contrats réels uniquement', 0, 1);
+            $pdf->Cell(0, 4, 'Contrats réels uniquement', 0, 1);
         }
         $pdf->SetTextColor(0, 0, 0); // Retour au noir
         $pdf->SetFont('helvetica', '', 10);
-        
-        // Retourner à la largeur pleine et espacer
-        $pdf->SetX(10);
+
         $pdf->Ln(5);
         
         // Tableau des transactions
@@ -462,19 +496,33 @@ class ExportAccount
         $previous_balance = 0;
         $filtered_count = count($this->transactions);
         
-        // Si filtre par année, calculer le solde reporté
+        // Si filtre par année, calculer le solde reporté (transactions + salaires)
         if ($filter_year > 0) {
+            // Transactions classiques
             $sql_previous = "SELECT COALESCE(SUM(t.amount), 0) as previous_balance
                 FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
                 LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
                 LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
                 WHERE t.fk_collaborator = ".$this->collaborator_id." AND t.status = 1
                 AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) < ".$filter_year;
-            
+
             $resql_previous = $this->db->query($sql_previous);
             if ($resql_previous) {
                 $previous_balance = $this->db->fetch_object($resql_previous)->previous_balance;
                 $this->db->free($resql_previous);
+            }
+
+            // Soustraire les salaires payés des années précédentes
+            $sql_previous_salaries = "SELECT COALESCE(SUM(solde_utilise), 0) as previous_salaries
+                FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration
+                WHERE fk_collaborator = ".$this->collaborator_id." AND status = 3
+                AND declaration_year < ".$filter_year;
+
+            $resql_previous_salaries = $this->db->query($sql_previous_salaries);
+            if ($resql_previous_salaries) {
+                $previous_salaries = $this->db->fetch_object($resql_previous_salaries)->previous_salaries;
+                $previous_balance -= $previous_salaries;
+                $this->db->free($resql_previous_salaries);
             }
         }
         
