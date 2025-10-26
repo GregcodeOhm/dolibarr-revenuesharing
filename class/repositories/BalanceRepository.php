@@ -81,6 +81,21 @@ class BalanceRepository
                 $previous_balance = $obj ? $obj->previous_balance : 0;
                 $this->db->free($resql_previous);
             }
+
+            // Soustraire les salaires payés des années précédentes
+            $sql_previous_salaries = "SELECT
+                COALESCE(SUM(solde_utilise), 0) as previous_salaries
+                FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration
+                WHERE fk_collaborator = ".(int)$collaboratorId." AND status = 3
+                AND declaration_year < ".$filter_year;
+
+            $resql_previous_salaries = $this->db->query($sql_previous_salaries);
+            if ($resql_previous_salaries) {
+                $obj_sal = $this->db->fetch_object($resql_previous_salaries);
+                $previous_salaries = $obj_sal ? $obj_sal->previous_salaries : 0;
+                $previous_balance -= $previous_salaries;
+                $this->db->free($resql_previous_salaries);
+            }
         }
 
         // Requête principale pour les statistiques de l'année (ou globales)
@@ -111,6 +126,29 @@ class BalanceRepository
 
         $balance_info = $this->db->fetch_object($resql_balance);
         $this->db->free($resql_balance);
+
+        // Ajouter les salaires payés (status = 3) comme des débits
+        $sql_salaries = "SELECT
+            COALESCE(SUM(solde_utilise), 0) as total_salaries_paid
+            FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration
+            WHERE fk_collaborator = ".(int)$collaboratorId." AND status = 3";
+
+        if ($filter_year > 0) {
+            $sql_salaries .= " AND declaration_year = ".$filter_year;
+        }
+
+        $resql_salaries = $this->db->query($sql_salaries);
+        if ($resql_salaries) {
+            $obj_salaries = $this->db->fetch_object($resql_salaries);
+            $total_salaries_paid = $obj_salaries->total_salaries_paid ? $obj_salaries->total_salaries_paid : 0;
+            $this->db->free($resql_salaries);
+
+            // Ajouter les salaires aux débits et soustraire du solde
+            if ($balance_info) {
+                $balance_info->year_debits += $total_salaries_paid;
+                $balance_info->year_balance -= $total_salaries_paid;
+            }
+        }
 
         // Ajouter le solde reporté
         if ($balance_info) {
@@ -245,6 +283,28 @@ class BalanceRepository
             $statistics[] = $obj;
         }
         $this->db->free($resql_stats);
+
+        // Ajouter les salaires payés (status = 3) comme un type de transaction
+        $sql_salaries_stats = "SELECT
+            'salary' as transaction_type,
+            COUNT(*) as nb_operations,
+            -COALESCE(SUM(solde_utilise), 0) as total_amount
+            FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration
+            WHERE fk_collaborator = ".(int)$collaboratorId." AND status = 3";
+
+        if ($filter_year > 0) {
+            $sql_salaries_stats .= " AND declaration_year = ".$filter_year;
+        }
+
+        $resql_salaries_stats = $this->db->query($sql_salaries_stats);
+        if ($resql_salaries_stats) {
+            $obj_salaries = $this->db->fetch_object($resql_salaries_stats);
+            // Ajouter seulement si il y a des salaires payés
+            if ($obj_salaries && $obj_salaries->nb_operations > 0) {
+                $statistics[] = $obj_salaries;
+            }
+            $this->db->free($resql_salaries_stats);
+        }
 
         return $statistics;
     }
