@@ -412,7 +412,7 @@ class ExportAccount
             
             $type_labels = array(
                 'contract' => 'Contrats',
-                'commission' => 'Commissions', 
+                'commission' => 'Commissions',
                 'bonus' => 'Bonus',
                 'interest' => 'Intéressements',
                 'advance' => 'Avances',
@@ -423,8 +423,30 @@ class ExportAccount
                 'other_credit' => 'Autres crédits',
                 'other_debit' => 'Autres débits'
             );
-            
+
+            $month_names = array(
+                1 => 'Janvier', 2 => 'Février', 3 => 'Mars', 4 => 'Avril',
+                5 => 'Mai', 6 => 'Juin', 7 => 'Juillet', 8 => 'Août',
+                9 => 'Septembre', 10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre'
+            );
+
+            $previous_month = null;
+
             foreach ($this->transactions as $trans) {
+                // Détecter le changement de mois
+                $trans_date = $this->db->jdate($trans->display_date);
+                $current_month = date('Y-m', $trans_date);
+                $current_month_name = $month_names[(int)date('n', $trans_date)] . ' ' . date('Y', $trans_date);
+
+                // Afficher le séparateur de mois si changement détecté
+                if ($previous_month !== null && $previous_month !== $current_month) {
+                    $pdf->SetFont('helvetica', 'B', 9);
+                    $pdf->SetFillColor(240, 240, 240);
+                    $pdf->Cell(190, 7, $current_month_name, 1, 1, 'L', true);
+                    $pdf->SetFont('helvetica', '', 8);
+                }
+                $previous_month = $current_month;
+
                 // Vérifier si on doit ajouter une nouvelle page
                 if ($pdf->GetY() > 250) {
                     $pdf->AddPage();
@@ -437,7 +459,7 @@ class ExportAccount
                     $pdf->Cell(35, 6, 'Référence', 1, 1, 'C');
                     $pdf->SetFont('helvetica', '', 8);
                 }
-                
+
                 $pdf->Cell(25, 6, dol_print_date($this->db->jdate($trans->display_date), 'day'), 1, 0, 'C');
                 $pdf->Cell(35, 6, $type_labels[$trans->transaction_type] ?? $trans->transaction_type, 1, 0, 'L');
                 
