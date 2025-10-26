@@ -178,7 +178,7 @@ class TransactionRepository
                     ' ', sd.declaration_year,
                     ' (', sd.total_days, ' jours)'
                 ) as description,
-                DATE(CONCAT(sd.declaration_year, '-', LPAD(sd.declaration_month, 2, '0'), '-01')) as transaction_date,
+                DATE(sd.date_modification) as transaction_date,
                 sd.date_creation,
                 sd.status,
                 NULL as fk_contract,
@@ -196,7 +196,7 @@ class TransactionRepository
                 NULL as facture_fourn_date,
                 NULL as facture_fourn_label,
                 u.login as user_login,
-                DATE(CONCAT(sd.declaration_year, '-', LPAD(sd.declaration_month, 2, '0'), '-01')) as display_date,
+                DATE(sd.date_modification) as display_date,
                 sd.rowid as salary_declaration_id,
                 sd.declaration_year,
                 sd.declaration_month,

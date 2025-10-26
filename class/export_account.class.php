@@ -153,7 +153,7 @@ class ExportAccount
                     ' ', sd.declaration_year,
                     ' (', sd.total_days, ' jours)'
                 ) as description,
-                DATE(CONCAT(sd.declaration_year, '-', LPAD(sd.declaration_month, 2, '0'), '-01')) as transaction_date,
+                DATE(sd.date_modification) as transaction_date,
                 sd.date_creation,
                 sd.status,
                 NULL as fk_contract,
@@ -167,7 +167,7 @@ class ExportAccount
                 NULL as facture_fourn_ref,
                 NULL as facture_fourn_date,
                 u.login as user_login,
-                DATE(CONCAT(sd.declaration_year, '-', LPAD(sd.declaration_month, 2, '0'), '-01')) as display_date
+                DATE(sd.date_modification) as display_date
             FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration sd
             LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = sd.fk_user_creat
             WHERE sd.fk_collaborator = ".$this->collaborator_id."
