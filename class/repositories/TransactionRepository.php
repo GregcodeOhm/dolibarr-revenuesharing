@@ -123,7 +123,6 @@ class TransactionRepository
                 t.transaction_type,
                 t.amount,
                 t.description,
-                t.label,
                 t.transaction_date,
                 t.date_creation,
                 t.status,
@@ -179,7 +178,6 @@ class TransactionRepository
                     ' ', sd.declaration_year,
                     ' (', sd.total_days, ' jours)'
                 ) as description,
-                CONCAT('Déclaration #', sd.rowid) as label,
                 DATE(CONCAT(sd.declaration_year, '-', LPAD(sd.declaration_month, 2, '0'), '-01')) as transaction_date,
                 sd.date_creation,
                 sd.status,
