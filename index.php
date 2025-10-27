@@ -323,6 +323,7 @@ if ($has_permission) {
 if ($user->admin) {
     print '<a href="auto_create_contracts.php" class="butAction" style="background: #fd7e14; color: white;"> Auto-création contrats</a> ';
     print '<a href="account_transaction.php" class="butAction" style="background: #17a2b8; color: white;">'.img_picto('', 'bank', 'class="pictofixedwidth"').' Nouvelle opération</a> ';
+    print '<a href="payroll_import.php" class="butAction" style="background: #6c757d; color: white;">'.img_picto('', 'technic', 'class="pictofixedwidth"').' Import Paie</a> ';
     print '<a href="admin/setup.php" class="butAction">'.img_picto('', 'setup', 'class="pictofixedwidth"').' Configuration</a>';
 }
 print '</div>';
