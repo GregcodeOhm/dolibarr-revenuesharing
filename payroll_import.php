@@ -95,11 +95,15 @@ if ($action == 'convert' && !empty($_FILES['payroll_file']['tmp_name'])) {
             print '<div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; margin: 20px 0; border-radius: 4px;">';
             print '<strong>✅ Fichier CSV généré avec succès !</strong><br>';
             print '<p style="margin: 10px 0;">Le fichier CSV est prêt à être importé dans le module Comptabilité de Dolibarr.</p>';
-            print '<div style="margin: 15px 0;">';
+            print '<div style="margin: 15px 0; display: flex; gap: 10px; flex-wrap: wrap;">';
             print '<a href="'.DOL_URL_ROOT.'/document.php?modulepart=revenuesharing&file=temp/'.$output_name.'" class="button">';
             print img_picto('', 'download', 'class="pictofixedwidth"').' Télécharger le fichier CSV';
             print '</a>';
+            print '<a href="'.DOL_URL_ROOT.'/imports/import.php?leftmenu=import" class="button" style="background: #28a745; color: white;">';
+            print img_picto('', 'import', 'class="pictofixedwidth"').' Importer dans la Comptabilité';
+            print '</a>';
             print '</div>';
+            print '<p style="margin-top: 10px; font-size: 0.9em; color: #666;"><strong>💡 Astuce :</strong> Téléchargez d\'abord le fichier CSV, puis cliquez sur "Importer dans la Comptabilité" pour accéder directement au module d\'import.</p>';
             print '</div>';
 
             // Aperçu des premières lignes
