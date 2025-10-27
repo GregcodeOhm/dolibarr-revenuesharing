@@ -254,7 +254,94 @@ class PayrollToAccounting
     }
 
     /**
-     * Alias pour compatibilité
+     * Génère un fichier CSV au format d'import comptable (alternative simple)
+     *
+     * @param string $output_filepath Chemin du fichier de sortie
+     * @param string $piece_num       Numéro d'écriture à utiliser
+     *
+     * @return bool True si succès
+     */
+    public function generateAccountingCSV($output_filepath, $piece_num = null)
+    {
+        if (empty($this->data)) {
+            $this->errors[] = "Aucune donnée à exporter. Veuillez d'abord parser un fichier.";
+            return false;
+        }
+
+        if ($piece_num) {
+            $this->piece_num = $piece_num;
+        }
+
+        try {
+            $fp = fopen($output_filepath, 'w');
+            if (!$fp) {
+                throw new Exception("Impossible de créer le fichier : ".$output_filepath);
+            }
+
+            // BOM UTF-8 pour Excel
+            fwrite($fp, "\xEF\xBB\xBF");
+
+            // Séparateur point-virgule
+            $delimiter = ';';
+
+            // En-tête
+            $headers = [
+                'Num. écriture (b.piece_num)',
+                'Date (b.doc_date)',
+                'Pièce (b.doc_ref)',
+                'Journal (b.code_journal)',
+                'Libellé journal (b.journal_label)',
+                'Compte comptable (b.numero_compte)',
+                'Libellé du compte (b.label_compte)',
+                'Compte auxiliaire (b.subledger_account)',
+                'Libellé du compte auxiliaire (b.subledger_label)',
+                'Libellé opération (b.label_operation)',
+                'Débit (b.debit)',
+                'Crédit (b.credit)',
+                'Direction (b.sens)'
+            ];
+
+            fputcsv($fp, $headers, $delimiter);
+
+            // Données
+            foreach ($this->data as $entry) {
+                $sens = '';
+                if ($entry['debit'] > 0) {
+                    $sens = 'D';
+                } elseif ($entry['credit'] > 0) {
+                    $sens = 'C';
+                }
+
+                $row = [
+                    $this->piece_num,
+                    $entry['date'],
+                    $entry['doc_ref'],
+                    $this->code_journal,
+                    $this->journal_label,
+                    $entry['numero_compte'],
+                    '',
+                    '',
+                    '',
+                    $entry['label_operation'],
+                    $entry['debit'],
+                    $entry['credit'],
+                    $sens
+                ];
+
+                fputcsv($fp, $row, $delimiter);
+            }
+
+            fclose($fp);
+            return true;
+
+        } catch (Exception $e) {
+            $this->errors[] = "Erreur lors de la génération du fichier CSV : ".$e->getMessage();
+            return false;
+        }
+    }
+
+    /**
+     * Alias pour compatibilité - essaie XLS, sinon CSV en fallback
      *
      * @param string $output_filepath Chemin du fichier de sortie
      * @param string $piece_num       Numéro d'écriture à utiliser
@@ -263,7 +350,17 @@ class PayrollToAccounting
      */
     public function generateAccountingExcel($output_filepath, $piece_num = null)
     {
-        return $this->generateAccountingXLS($output_filepath, $piece_num);
+        // Essayer d'abord le XLS
+        $result = $this->generateAccountingXLS($output_filepath, $piece_num);
+
+        // Si échec, essayer CSV en fallback
+        if (!$result) {
+            // Changer l'extension en .csv
+            $csv_path = preg_replace('/\.xlsx?$/i', '.csv', $output_filepath);
+            return $this->generateAccountingCSV($csv_path, $piece_num);
+        }
+
+        return $result;
     }
 
     /**

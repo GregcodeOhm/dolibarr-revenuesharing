@@ -4,6 +4,10 @@
  * Fichier: /htdocs/custom/revenuesharing/payroll_import.php
  */
 
+// Activer l'affichage des erreurs pour debug
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+
 require_once '../../main.inc.php';
 require_once __DIR__.'/class/PayrollToAccounting.class.php';
 
@@ -81,8 +85,8 @@ if ($action == 'convert' && !empty($_FILES['payroll_file']['tmp_name'])) {
         print '</div>';
         print '</div>';
 
-        // Générer le fichier Excel
-        $output_name = 'Import_Comptable_'.date('Y-m-d_His').'.xlsx';
+        // Générer le fichier CSV (plus simple et compatible)
+        $output_name = 'Import_Comptable_'.date('Y-m-d_His').'.csv';
         $output_path = DOL_DATA_ROOT.'/revenuesharing/temp/'.$output_name;
 
         // Créer le répertoire si nécessaire
@@ -91,12 +95,13 @@ if ($action == 'convert' && !empty($_FILES['payroll_file']['tmp_name'])) {
             dol_mkdir($temp_dir);
         }
 
-        if ($converter->generateAccountingXLS($output_path, $piece_num)) {
+        if ($converter->generateAccountingCSV($output_path, $piece_num)) {
             print '<div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; margin: 20px 0; border-radius: 4px;">';
-            print '<strong>✅ Fichier Excel généré avec succès !</strong><br>';
-            print '<p style="margin: 10px 0;">Le fichier Excel est prêt à être importé dans le module Comptabilité de Dolibarr.</p>';
+            print '<strong>✅ Fichier CSV généré avec succès !</strong><br>';
+            print '<p style="margin: 10px 0;">Le fichier CSV est prêt à être importé dans le module Comptabilité de Dolibarr.</p>';
+            print '<p><strong>Chemin du fichier:</strong> '.$output_path.'</p>';
             print '<a href="'.DOL_URL_ROOT.'/document.php?modulepart=revenuesharing&file=temp/'.$output_name.'" class="button" style="margin-top: 10px;">';
-            print img_picto('', 'download', 'class="pictofixedwidth"').' Télécharger le fichier Excel';
+            print img_picto('', 'download', 'class="pictofixedwidth"').' Télécharger le fichier CSV';
             print '</a>';
             print '</div>';
 
@@ -148,7 +153,15 @@ if ($action == 'convert' && !empty($_FILES['payroll_file']['tmp_name'])) {
 
     } catch (Exception $e) {
         print '<div style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24; padding: 15px; margin: 20px 0; border-radius: 4px;">';
-        print '<strong>⚠️ Erreur:</strong> '.htmlspecialchars($e->getMessage());
+        print '<strong>⚠️ Erreur:</strong> '.htmlspecialchars($e->getMessage()).'<br>';
+        print '<strong>Fichier:</strong> '.$e->getFile().' ligne '.$e->getLine().'<br>';
+        print '<pre>'.htmlspecialchars($e->getTraceAsString()).'</pre>';
+        print '</div>';
+    } catch (Throwable $e) {
+        print '<div style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24; padding: 15px; margin: 20px 0; border-radius: 4px;">';
+        print '<strong>⚠️ Erreur fatale:</strong> '.htmlspecialchars($e->getMessage()).'<br>';
+        print '<strong>Fichier:</strong> '.$e->getFile().' ligne '.$e->getLine().'<br>';
+        print '<pre>'.htmlspecialchars($e->getTraceAsString()).'</pre>';
         print '</div>';
     }
 }
@@ -189,7 +202,7 @@ print '</tr>';
 print '</table>';
 
 print '<div style="text-align: center; margin-top: 20px;">';
-print '<input type="submit" class="button" value="Convertir en format Excel">';
+print '<input type="submit" class="button" value="Convertir en format CSV">';
 print '</div>';
 
 print '</form>';
