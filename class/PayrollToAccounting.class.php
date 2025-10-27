@@ -9,13 +9,9 @@
  * @license    GPL-3.0+
  */
 
-require_once DOL_DOCUMENT_ROOT.'/includes/phpoffice/phpspreadsheet/src/PhpSpreadsheet/Spreadsheet.php';
-require_once DOL_DOCUMENT_ROOT.'/includes/phpoffice/phpspreadsheet/src/PhpSpreadsheet/Writer/Xlsx.php';
-
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Border;
+// Les classes PhpSpreadsheet seront chargées via l'autoloader de Dolibarr
+// require_once DOL_DOCUMENT_ROOT.'/includes/phpoffice/phpspreadsheet/src/PhpSpreadsheet/Spreadsheet.php';
+// require_once DOL_DOCUMENT_ROOT.'/includes/phpoffice/phpspreadsheet/src/PhpSpreadsheet/Writer/Xlsx.php';
 
 /**
  * Classe de conversion des exports de paie vers format comptable
@@ -188,7 +184,16 @@ class PayrollToAccounting
         }
 
         try {
-            $spreadsheet = new Spreadsheet();
+            // Charger l'autoloader de PhpSpreadsheet si disponible
+            if (!class_exists('PhpOffice\PhpSpreadsheet\Spreadsheet')) {
+                if (file_exists(DOL_DOCUMENT_ROOT.'/includes/phpoffice/phpspreadsheet/src/Bootstrap.php')) {
+                    require_once DOL_DOCUMENT_ROOT.'/includes/phpoffice/phpspreadsheet/src/Bootstrap.php';
+                } else {
+                    throw new Exception("PhpSpreadsheet n'est pas disponible sur ce serveur");
+                }
+            }
+
+            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
 
             // En-tête du fichier
@@ -217,7 +222,7 @@ class PayrollToAccounting
 
             // Style de l'en-tête
             $sheet->getStyle('A1:M1')->getFont()->setBold(true);
-            $sheet->getStyle('A1:M1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('A1:M1')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
 
             // Écrire les données
             $row = 2;
@@ -253,7 +258,7 @@ class PayrollToAccounting
             }
 
             // Sauvegarder le fichier
-            $writer = new Xlsx($spreadsheet);
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
             $writer->save($output_filepath);
 
             return true;
