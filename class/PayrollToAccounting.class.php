@@ -9,15 +9,16 @@
  * @license    GPL-3.0+
  */
 
-// Les classes PhpSpreadsheet seront chargées via l'autoloader de Dolibarr
-// require_once DOL_DOCUMENT_ROOT.'/includes/phpoffice/phpspreadsheet/src/PhpSpreadsheet/Spreadsheet.php';
-// require_once DOL_DOCUMENT_ROOT.'/includes/phpoffice/phpspreadsheet/src/PhpSpreadsheet/Writer/Xlsx.php';
+// Utiliser le module d'export Excel de Dolibarr
+require_once DOL_DOCUMENT_ROOT.'/core/modules/export/export_excel2007.modules.php';
 
 /**
  * Classe de conversion des exports de paie vers format comptable
  *
  * Convertit les fichiers texte d'export de paie (format tabulé) vers
- * le format Excel d'import comptable Dolibarr avec 13 colonnes.
+ * le format CSV d'import comptable Dolibarr avec 13 colonnes.
+ * Note: Le format CSV est préféré car Dolibarr le supporte nativement
+ * sans dépendances externes.
  */
 class PayrollToAccounting
 {
@@ -150,7 +151,9 @@ class PayrollToAccounting
     }
 
     /**
-     * Génère un fichier Excel au format d'import comptable Dolibarr
+     * Génère un fichier XLSX au format d'import comptable Dolibarr
+     *
+     * Utilise le module d'export Excel natif de Dolibarr (ExportExcel2007)
      *
      * Format de sortie (13 colonnes):
      * 1. Num. écriture (b.piece_num)
@@ -172,7 +175,7 @@ class PayrollToAccounting
      *
      * @return bool True si succès
      */
-    public function generateAccountingExcel($output_filepath, $piece_num = null)
+    public function generateAccountingXLS($output_filepath, $piece_num = null)
     {
         if (empty($this->data)) {
             $this->errors[] = "Aucune donnée à exporter. Veuillez d'abord parser un fichier.";
@@ -184,17 +187,11 @@ class PayrollToAccounting
         }
 
         try {
-            // Charger l'autoloader de PhpSpreadsheet si disponible
-            if (!class_exists('PhpOffice\PhpSpreadsheet\Spreadsheet')) {
-                if (file_exists(DOL_DOCUMENT_ROOT.'/includes/phpoffice/phpspreadsheet/src/Bootstrap.php')) {
-                    require_once DOL_DOCUMENT_ROOT.'/includes/phpoffice/phpspreadsheet/src/Bootstrap.php';
-                } else {
-                    throw new Exception("PhpSpreadsheet n'est pas disponible sur ce serveur");
-                }
-            }
+            // Utiliser le module d'export Excel de Dolibarr
+            $exporter = new ExportExcel2007($this->db);
 
-            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
-            $sheet = $spreadsheet->getActiveSheet();
+            // Ouvrir le fichier
+            $exporter->open_file($output_filepath, '');
 
             // En-tête du fichier
             $headers = [
@@ -214,18 +211,9 @@ class PayrollToAccounting
             ];
 
             // Écrire l'en-tête
-            $col = 'A';
-            foreach ($headers as $header) {
-                $sheet->setCellValue($col.'1', $header);
-                $col++;
-            }
-
-            // Style de l'en-tête
-            $sheet->getStyle('A1:M1')->getFont()->setBold(true);
-            $sheet->getStyle('A1:M1')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $exporter->write_header('Import Comptable', $headers);
 
             // Écrire les données
-            $row = 2;
             foreach ($this->data as $entry) {
                 // Déterminer la direction (sens)
                 $sens = '';
@@ -235,38 +223,47 @@ class PayrollToAccounting
                     $sens = 'C';
                 }
 
-                $sheet->setCellValue('A'.$row, $this->piece_num);
-                $sheet->setCellValue('B'.$row, $entry['date']);
-                $sheet->setCellValue('C'.$row, $entry['doc_ref']);
-                $sheet->setCellValue('D'.$row, $this->code_journal);
-                $sheet->setCellValue('E'.$row, $this->journal_label);
-                $sheet->setCellValue('F'.$row, $entry['numero_compte']);
-                $sheet->setCellValue('G'.$row, ''); // Libellé du compte (à remplir par Dolibarr)
-                $sheet->setCellValue('H'.$row, ''); // Compte auxiliaire
-                $sheet->setCellValue('I'.$row, ''); // Libellé compte auxiliaire
-                $sheet->setCellValue('J'.$row, $entry['label_operation']);
-                $sheet->setCellValue('K'.$row, $entry['debit']);
-                $sheet->setCellValue('L'.$row, $entry['credit']);
-                $sheet->setCellValue('M'.$row, $sens);
+                $row = [
+                    $this->piece_num,
+                    $entry['date'],
+                    $entry['doc_ref'],
+                    $this->code_journal,
+                    $this->journal_label,
+                    $entry['numero_compte'],
+                    '', // Libellé du compte (à remplir par Dolibarr)
+                    '', // Compte auxiliaire
+                    '', // Libellé compte auxiliaire
+                    $entry['label_operation'],
+                    $entry['debit'],
+                    $entry['credit'],
+                    $sens
+                ];
 
-                $row++;
+                $exporter->write_record($row, $headers);
             }
 
-            // Ajuster la largeur des colonnes
-            foreach (range('A', 'M') as $col) {
-                $sheet->getColumnDimension($col)->setAutoSize(true);
-            }
-
-            // Sauvegarder le fichier
-            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-            $writer->save($output_filepath);
+            // Fermer le fichier
+            $exporter->close_file();
 
             return true;
 
         } catch (Exception $e) {
-            $this->errors[] = "Erreur lors de la génération du fichier Excel : ".$e->getMessage();
+            $this->errors[] = "Erreur lors de la génération du fichier XLSX : ".$e->getMessage();
             return false;
         }
+    }
+
+    /**
+     * Alias pour compatibilité
+     *
+     * @param string $output_filepath Chemin du fichier de sortie
+     * @param string $piece_num       Numéro d'écriture à utiliser
+     *
+     * @return bool True si succès
+     */
+    public function generateAccountingExcel($output_filepath, $piece_num = null)
+    {
+        return $this->generateAccountingXLS($output_filepath, $piece_num);
     }
 
     /**
