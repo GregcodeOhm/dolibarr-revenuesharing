@@ -4,10 +4,6 @@
  * Fichier: /htdocs/custom/revenuesharing/payroll_import.php
  */
 
-// Activer l'affichage des erreurs pour debug
-error_reporting(E_ALL);
-ini_set('display_errors', '1');
-
 require_once '../../main.inc.php';
 require_once __DIR__.'/class/PayrollToAccounting.class.php';
 
@@ -99,10 +95,11 @@ if ($action == 'convert' && !empty($_FILES['payroll_file']['tmp_name'])) {
             print '<div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; margin: 20px 0; border-radius: 4px;">';
             print '<strong>✅ Fichier CSV généré avec succès !</strong><br>';
             print '<p style="margin: 10px 0;">Le fichier CSV est prêt à être importé dans le module Comptabilité de Dolibarr.</p>';
-            print '<p><strong>Chemin du fichier:</strong> '.$output_path.'</p>';
-            print '<a href="'.DOL_URL_ROOT.'/document.php?modulepart=revenuesharing&file=temp/'.$output_name.'" class="button" style="margin-top: 10px;">';
+            print '<div style="margin: 15px 0;">';
+            print '<a href="'.DOL_URL_ROOT.'/document.php?modulepart=revenuesharing&file=temp/'.$output_name.'" class="button">';
             print img_picto('', 'download', 'class="pictofixedwidth"').' Télécharger le fichier CSV';
             print '</a>';
+            print '</div>';
             print '</div>';
 
             // Aperçu des premières lignes
