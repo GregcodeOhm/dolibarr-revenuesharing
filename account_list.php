@@ -131,10 +131,10 @@ try {
             
             print '<tr class="oddeven">';
             print '<td class="center"><div style="font-size: 1.5em; font-weight: bold;">'.$stats->nb_collaborators.'</div></td>';
-            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold;" class="badge badge-status4">'.price($stats->total_all_credits).'</div></td>';
-            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold;" class="badge badge-status8">'.price($stats->total_all_debits).'</div></td>';
+            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold;" class="badge badge-success">'.price($stats->total_all_credits).'</div></td>';
+            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold;" class="badge badge-danger">'.price($stats->total_all_debits).'</div></td>';
 
-            $badge_class = ($stats->total_balance >= 0) ? 'badge-status4' : 'badge-status8';
+            $badge_class = ($stats->total_balance >= 0) ? 'badge-success' : 'badge-danger';
             print '<td class="center"><div style="font-size: 1.5em; font-weight: bold;" class="badge '.$badge_class.'">'.price($stats->total_balance).'</div></td>';
             print '</tr>';
             
@@ -184,7 +184,7 @@ try {
         print '<td class="center">';
         $credits_value = ($filter_year > 0) ? $obj->year_credits : $obj->total_credits;
         if ($credits_value > 0) {
-            print '<span class="badge badge-status4" style="padding: 3px 6px;">'.price($credits_value).'</span>';
+            print '<span class="badge badge-success" style="padding: 3px 6px;">'.price($credits_value).'</span>';
         } else {
             print '<span class="opacitymedium">0,00 €</span>';
         }
@@ -194,7 +194,7 @@ try {
         print '<td class="center">';
         $debits_value = ($filter_year > 0) ? $obj->year_debits : $obj->total_debits;
         if ($debits_value > 0) {
-            print '<span class="badge badge-status8" style="padding: 3px 6px;">'.price($debits_value).'</span>';
+            print '<span class="badge badge-danger" style="padding: 3px 6px;">'.price($debits_value).'</span>';
         } else {
             print '<span class="opacitymedium">0,00 €</span>';
         }
@@ -203,7 +203,7 @@ try {
         // Solde (avec filtre année)
         print '<td class="center">';
         $balance_value = ($filter_year > 0) ? $obj->year_balance : $obj->current_balance;
-        $badge_class = ($balance_value >= 0) ? 'badge-status4' : 'badge-status8';
+        $badge_class = ($balance_value >= 0) ? 'badge-success' : 'badge-danger';
         print '<span class="badge '.$badge_class.'" style="padding: 4px 8px; font-size: 1em;">';
         print price($balance_value);
         print '</span>';
@@ -212,7 +212,7 @@ try {
         // Nb transactions (avec filtre année)
         print '<td class="center">';
         if ($obj->nb_transactions > 0) {
-            print '<span class="badge badge-status1">'.$obj->nb_transactions.'</span>';
+            print '<span class="badge badge-info">'.$obj->nb_transactions.'</span>';
         } else {
             print '<span class="opacitymedium">0</span>';
         }

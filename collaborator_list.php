@@ -163,9 +163,9 @@ try {
             // Statut
             print '<td class="center">';
             if ($obj->active) {
-                print '<span class="badge badge-status4 badge-status">Actif</span>';
+                print '<span class="badge badge-success badge-status">Actif</span>';
             } else {
-                print '<span class="badge badge-status8 badge-status">Inactif</span>';
+                print '<span class="badge badge-danger badge-status">Inactif</span>';
             }
             print '</td>';
 

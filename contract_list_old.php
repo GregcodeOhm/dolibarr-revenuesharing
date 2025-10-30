@@ -337,11 +337,11 @@ if ($resql) {
             // Statut
             print '<td class="center">';
             if ($obj->status == 0) {
-                print '<span class="badge badge-status1 badge-status">📝 Brouillon</span>';
+                print '<span class="badge badge-info badge-status">📝 Brouillon</span>';
             } elseif ($obj->status == 1) {
-                print '<span class="badge badge-status4 badge-status">✅ Validé</span>';
+                print '<span class="badge badge-success badge-status">✅ Validé</span>';
             } else {
-                print '<span class="badge badge-status8 badge-status">❓ Inconnu</span>';
+                print '<span class="badge badge-danger badge-status">❓ Inconnu</span>';
             }
             print '</td>';
 
