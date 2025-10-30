@@ -41,32 +41,9 @@ if (!$resql_check || $db->num_rows($resql_check) == 0) {
     exit;
 }
 
-// Recalcul des soldes depuis les transactions
-try {
-    $sql_recalc = "UPDATE ".MAIN_DB_PREFIX."revenuesharing_account_balance ab
-    SET
-        total_credits = COALESCE((
-            SELECT SUM(amount)
-            FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
-            WHERE t.fk_collaborator = ab.fk_collaborator
-            AND t.amount > 0 AND t.status = 1
-        ), 0),
-        total_debits = COALESCE((
-            SELECT ABS(SUM(amount))
-            FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
-            WHERE t.fk_collaborator = ab.fk_collaborator
-            AND t.amount < 0 AND t.status = 1
-        ), 0),
-        current_balance = COALESCE((
-            SELECT SUM(amount)
-            FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
-            WHERE t.fk_collaborator = ab.fk_collaborator AND t.status = 1
-        ), 0)";
-
-    $db->query($sql_recalc);
-} catch (Exception $e) {
-    // Erreur silencieuse, non bloquante
-}
+// Note: Les soldes sont maintenant calculés par le BalanceRepository
+// qui prend en compte les transactions ET les salaires déclarés (status=3)
+// Le recalcul automatique a été supprimé pour éviter les incohérences
 
 // Formulaire de filtrage
 print '<div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin: 20px 0;">';
