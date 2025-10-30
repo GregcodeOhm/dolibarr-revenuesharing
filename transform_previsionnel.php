@@ -180,7 +180,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 <strong>Facture sélectionnée :</strong> ${item.ref}<br>
                 <strong>Montant HT :</strong> ${item.total_ht.toFixed(2)} €<br>
                 <strong>Client :</strong> ${item.client}<br>
-                <small style="color: #666;">Le contrat sera mis à jour avec ce montant</small>
+                <small class="opacitymedium">Le contrat sera mis à jour avec ce montant</small>
             `;
 
             document.getElementById("facture_details").innerHTML = details;

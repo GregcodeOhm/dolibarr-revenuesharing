@@ -152,7 +152,7 @@ print '<div style="display: flex; align-items: center; gap: 10px;">';
 print '<input type="range" name="pourcentage_collaborateur" value="'.$pourcentage_collaborateur.'" min="0" max="100" step="1" style="flex: 1;" oninput="updatePercentageDisplay(this.value)">';
 print '<span id="percentage_display" style="background: #e3f2fd; padding: 5px 10px; border-radius: 3px; font-weight: bold; min-width: 50px; text-align: center;">'.$pourcentage_collaborateur.'%</span>';
 print '</div>';
-print '<small style="color: #666; display: block; margin-top: 5px;">Utilisez le curseur pour ajuster le pourcentage</small>';
+print '<small style="color: var(--colortextbackhmenu); display: block; margin-top: 5px;">Utilisez le curseur pour ajuster le pourcentage</small>';
 print '</div>';
 
 print '<div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 5px; padding: 10px;">';
@@ -202,7 +202,7 @@ if (!empty($results)) {
     // Colonne droite - Répartition (toujours en HT pour les parts)
     print '<div>';
     print '<h4 style="color: #007cba; margin-bottom: 10px;">💰 Répartition sur Prix Cible ('.$type_label.')</h4>';
-    print '<small style="color: #666; margin-bottom: 10px; display: block; font-style: italic;">⚠️ Les parts collaborateur/studio sont toujours calculées en HT</small>';
+    print '<small style="color: var(--colortextbackhmenu); margin-bottom: 10px; display: block; font-style: italic;">⚠️ Les parts collaborateur/studio sont toujours calculées en HT</small>';
     print '<table class="noborder" style="width: 100%;">';
     print '<tr style="background: #e3f2fd;"><td><strong>Part Collaborateur ('.$results['pourcentage_collaborateur'].'%) (HT) :</strong></td><td style="text-align: right;"><strong style="color: #007cba;">'.price($results['part_collaborateur']).'</strong></td></tr>';
     print '<tr style="background: #f8f9fa;"><td><strong>Part Studio ('.$results['pourcentage_studio'].'%) (HT) :</strong></td><td style="text-align: right;"><strong style="color: #28a745;">'.price($results['part_studio']).'</strong></td></tr>';
@@ -224,7 +224,7 @@ if (!empty($results)) {
     print '<div style="background: #28a745; color: white; width: '.$studio_width.'%; display: flex; align-items: center; justify-content: center; font-weight: bold;">Studio '.$studio_width.'%</div>';
     print '</div>';
 
-    print '<p style="text-align: center; margin: 10px 0; font-style: italic; color: #666;">Répartition sur le montant final de '.price($results['prix_cible']).' '.$type_label.'</p>';
+    print '<p style="text-align: center; margin: 10px 0; font-style: italic; color: var(--colortextbackhmenu);">Répartition sur le montant final de '.price($results['prix_cible']).' '.$type_label.'</p>';
     if ($results['type_prix'] == 'ttc') {
         print '<p style="text-align: center; margin: 5px 0; font-size: 0.9em; color: #dc3545;">⚠️ Parts calculées sur base HT (prix TTC / 1.20)</p>';
     }

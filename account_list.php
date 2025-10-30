@@ -130,12 +130,12 @@ try {
             print '</tr>';
             
             print '<tr class="oddeven">';
-            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold; color: #007cba;">'.$stats->nb_collaborators.'</div></td>';
-            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold; color: #28a745;">'.price($stats->total_all_credits).'</div></td>';
-            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold; color: #dc3545;">'.price($stats->total_all_debits).'</div></td>';
-            
-            $balance_color = ($stats->total_balance >= 0) ? '#28a745' : '#dc3545';
-            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold; color: '.$balance_color.';">'.price($stats->total_balance).'</div></td>';
+            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold;">'.$stats->nb_collaborators.'</div></td>';
+            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold;" class="badge badge-status4">'.price($stats->total_all_credits).'</div></td>';
+            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold;" class="badge badge-status8">'.price($stats->total_all_debits).'</div></td>';
+
+            $badge_class = ($stats->total_balance >= 0) ? 'badge-status4' : 'badge-status8';
+            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold;" class="badge '.$badge_class.'">'.price($stats->total_balance).'</div></td>';
             print '</tr>';
             
             print '</table>';
@@ -176,69 +176,61 @@ try {
         print '<td>';
         print '<strong>'.$obj->label.'</strong>';
         if ($obj->firstname && $obj->lastname) {
-            print '<br><small style="color: #666;">'.$obj->firstname.' '.$obj->lastname.'</small>';
+            print '<br><small class="opacitymedium">'.$obj->firstname.' '.$obj->lastname.'</small>';
         }
         print '</td>';
-        
+
         // Crédits (avec filtre année)
         print '<td class="center">';
         $credits_value = ($filter_year > 0) ? $obj->year_credits : $obj->total_credits;
         if ($credits_value > 0) {
-            print '<span style="color: #28a745; background: #d4edda; padding: 3px 6px; border-radius: 6px; font-weight: bold; font-size: 0.9em;">'.price($credits_value).'</span>';
+            print '<span class="badge badge-status4" style="padding: 3px 6px;">'.price($credits_value).'</span>';
         } else {
-            print '<span style="color: #ccc;">0,00 €</span>';
+            print '<span class="opacitymedium">0,00 €</span>';
         }
         print '</td>';
-        
+
         // Débits (avec filtre année)
         print '<td class="center">';
         $debits_value = ($filter_year > 0) ? $obj->year_debits : $obj->total_debits;
         if ($debits_value > 0) {
-            print '<span style="color: #dc3545; background: #f8d7da; padding: 3px 6px; border-radius: 6px; font-weight: bold; font-size: 0.9em;">'.price($debits_value).'</span>';
+            print '<span class="badge badge-status8" style="padding: 3px 6px;">'.price($debits_value).'</span>';
         } else {
-            print '<span style="color: #ccc;">0,00 €</span>';
+            print '<span class="opacitymedium">0,00 €</span>';
         }
         print '</td>';
-        
-        // Solde (avec filtre année)  
+
+        // Solde (avec filtre année)
         print '<td class="center">';
         $balance_value = ($filter_year > 0) ? $obj->year_balance : $obj->current_balance;
-        if ($balance_value >= 0) {
-            $balance_color = '#28a745';
-            $balance_bg = '#d4edda';
-            $balance_icon = '';
-        } else {
-            $balance_color = '#dc3545';
-            $balance_bg = '#f8d7da';
-            $balance_icon = '';
-        }
-        print '<span style="color: '.$balance_color.'; background: '.$balance_bg.'; padding: 4px 8px; border-radius: 8px; font-weight: bold; font-size: 1em;">';
-        print $balance_icon.' '.price($balance_value);
+        $badge_class = ($balance_value >= 0) ? 'badge-status4' : 'badge-status8';
+        print '<span class="badge '.$badge_class.'" style="padding: 4px 8px; font-size: 1em;">';
+        print price($balance_value);
         print '</span>';
         print '</td>';
-        
+
         // Nb transactions (avec filtre année)
         print '<td class="center">';
         if ($obj->nb_transactions > 0) {
-            print '<span class="badge" style="background: #007cba; color: white; padding: 2px 6px; border-radius: 3px;">'.$obj->nb_transactions.'</span>';
+            print '<span class="badge badge-status1">'.$obj->nb_transactions.'</span>';
         } else {
-            print '<span style="color: #ccc;">0</span>';
+            print '<span class="opacitymedium">0</span>';
         }
         print '</td>';
-        
+
         // Dernière opération
         print '<td class="center">';
         if ($obj->last_transaction_date) {
             print dol_print_date($db->jdate($obj->last_transaction_date), 'day');
         } else {
-            print '<span style="color: #ccc;">-</span>';
+            print '<span class="opacitymedium">-</span>';
         }
         print '</td>';
-        
+
         // Actions
         print '<td class="center">';
         print '<a href="account_detail.php?id='.$obj->rowid.'" class="button" style="margin: 2px;"> Voir</a>';
-        print '<a href="account_transaction.php?collaborator_id='.$obj->rowid.'" class="button" style="margin: 2px; background: #fd7e14; color: white;"> Opération</a>';
+        print '<a href="account_transaction.php?collaborator_id='.$obj->rowid.'" class="butActionDelete" style="margin: 2px;"> Opération</a>';
         print '</td>';
         
         print '</tr>';

@@ -512,7 +512,7 @@ if (!$filter_analytique && !$filter_intervenant) {
                 print '<td><strong>'.$secteur_label.'</strong></td>';
                 $current_secteur = $obj->analytique;
             } else {
-                print '<td style="color: #ccc; font-style: italic;">↳ suite</td>';
+                print '<td style="color: var(--colortextbackhmenu); font-style: italic;">↳ suite</td>';
             }
 
             print '<td>'.dol_escape_htmltag($obj->intervenant).'</td>';

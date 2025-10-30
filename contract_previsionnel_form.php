@@ -159,13 +159,13 @@ print '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">';
 print '<div>';
 print '<label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333;">Date de prestation prévue</label>';
 print '<input type="date" name="date_prestation" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" value="'.date('Y-m-d').'">';
-print '<small style="color: #666; display: block; margin-top: 3px;">Date estimée de la prestation</small>';
+print '<small style="color: var(--colortextbackhmenu); display: block; margin-top: 3px;">Date estimée de la prestation</small>';
 print '</div>';
 
 print '<div>';
 print '<label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333;">Date de facturation prévue</label>';
 print '<input type="date" name="date_facturation" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">';
-print '<small style="color: #666; display: block; margin-top: 3px;">Optionnel - Quand facturer ce contrat</small>';
+print '<small style="color: var(--colortextbackhmenu); display: block; margin-top: 3px;">Optionnel - Quand facturer ce contrat</small>';
 print '</div>';
 
 print '</div>';

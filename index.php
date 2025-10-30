@@ -180,7 +180,7 @@ print '<div style="font-size: 1.5em; font-weight: bold; color: #ffc107;">'.price
 print '<div>Revenus collaborateurs</div>';
 if ($stats['total_studio'] > 0) {
     $percentage = $stats['total_ht'] > 0 ? round(($stats['total_collaborator'] / $stats['total_ht']) * 100, 1) : 0;
-    print '<div style="font-size: 0.9em; color: #666;">('.$percentage.'% du CA)</div>';
+    print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu);">('.$percentage.'% du CA)</div>';
 }
 print '</td>';
 
@@ -216,7 +216,7 @@ if ($stats['total_ht'] > 0) {
 
     print '</div>';
 } else {
-    print '<div class="center" style="padding: 15px; color: #666;">Aucun contrat validé pour '.$year.'</div>';
+    print '<div class="center" style="padding: 15px; color: var(--colortextbackhmenu);">Aucun contrat validé pour '.$year.'</div>';
 }
 
 // Historique des 5 dernières années

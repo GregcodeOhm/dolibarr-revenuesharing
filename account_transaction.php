@@ -212,7 +212,7 @@ print '<div style="display: flex; gap: 15px; align-items: center; margin-bottom:
 print '<button type="button" id="selectInvoiceBtn" onclick="openSupplierInvoiceModal()" style="background: #007cba; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 1em;">';
 print 'Sélectionner une facture fournisseur';
 print '</button>';
-print '<span style="color: #666; font-style: italic;">Optionnel - Cliquez pour choisir une facture</span>';
+print '<span style="color: var(--colortextbackhmenu); font-style: italic;">Optionnel - Cliquez pour choisir une facture</span>';
 print '</div>';
 
 // Zone d'affichage de la facture sélectionnée
@@ -230,7 +230,7 @@ print '</div>'; // Fermeture de la section liaison facture fournisseur
 print '<div style="margin-bottom: 20px;">';
 print '<label style="display: block; font-weight: bold; margin-bottom: 5px;"> <span style="color: red;">*</span> Montant :</label>';
 print '<input type="number" name="amount" id="amount" step="0.01" required style="width: 200px; padding: 8px; font-size: 1em;" placeholder="0.00" value="'.($amount ? $amount : '').'">';
-print '<small style="display: block; color: #666; margin-top: 5px;">Le signe sera automatiquement ajusté selon le type d\'opération</small>';
+print '<small style="display: block; color: var(--colortextbackhmenu); margin-top: 5px;">Le signe sera automatiquement ajusté selon le type d\'opération</small>';
 print '</div>';
 
 // Description
@@ -505,7 +505,7 @@ function displayModalInvoices(invoices) {
     const listDiv = document.getElementById('modal_invoices_list');
     
     if (invoices.length === 0) {
-        listDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;"><div style="font-size: 3em;"></div><h3>Aucune facture trouvée</h3><p>Essayez de modifier les filtres ci-dessus</p></div>';
+        listDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--colortextbackhmenu);"><div style="font-size: 3em;"></div><h3>Aucune facture trouvée</h3><p>Essayez de modifier les filtres ci-dessus</p></div>';
         return;
     }
     
@@ -523,9 +523,9 @@ function displayModalInvoices(invoices) {
         // Informations de la facture
         html += '<div style="flex: 1;">';
         html += '<div style="font-weight: bold; color: #007cba; font-size: 1.1em;">' + lockIcon + ' ' + statusIcon + ' ' + escapeHtml(invoice.ref) + '</div>';
-        html += '<div style="margin: 5px 0; color: #666;">' + escapeHtml(invoice.supplier_name) + '</div>';
+        html += '<div style="margin: 5px 0; color: var(--colortextbackhmenu);">' + escapeHtml(invoice.supplier_name) + '</div>';
         if (invoice.libelle) {
-            html += '<div style="font-style: italic; color: #666; margin: 5px 0;">' + escapeHtml(invoice.libelle) + '</div>';
+            html += '<div style="font-style: italic; color: var(--colortextbackhmenu); margin: 5px 0;">' + escapeHtml(invoice.libelle) + '</div>';
         }
         html += '<div style="margin: 8px 0;"><strong>' + parseFloat(invoice.total_ht).toFixed(2) + ' €</strong> - ' + invoice.datef_formatted + '</div>';
         
@@ -612,9 +612,9 @@ function selectInvoice(id, ref, amount, date, libelle, supplierName) {
     let html = '<div style="display: flex; justify-content: space-between; align-items: start;">';
     html += '<div>';
     html += '<div style="font-weight: bold; color: #007cba; font-size: 1.1em;"> ' + escapeHtml(ref) + '</div>';
-    html += '<div style="margin: 5px 0; color: #666;">' + escapeHtml(supplierName) + '</div>';
+    html += '<div style="margin: 5px 0; color: var(--colortextbackhmenu);">' + escapeHtml(supplierName) + '</div>';
     if (libelle) {
-        html += '<div style="font-style: italic; color: #666; margin: 5px 0;">' + escapeHtml(libelle) + '</div>';
+        html += '<div style="font-style: italic; color: var(--colortextbackhmenu); margin: 5px 0;">' + escapeHtml(libelle) + '</div>';
     }
     html += '<div style="margin-top: 8px;"><strong>' + parseFloat(amount).toFixed(2) + ' €</strong></div>';
     html += '</div>';

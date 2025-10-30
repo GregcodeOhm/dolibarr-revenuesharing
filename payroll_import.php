@@ -55,17 +55,17 @@ if ($action == 'convert' && !empty($_FILES['payroll_file']['tmp_name'])) {
 
         print '<div style="text-align: center;">';
         print '<div style="font-size: 1.5em; font-weight: bold; color: #2d7d2d;">'.$stats->nb_entries.'</div>';
-        print '<div style="color: #666;">Écritures comptables</div>';
+        print '<div class="opacitymedium">Écritures comptables</div>';
         print '</div>';
 
         print '<div style="text-align: center;">';
         print '<div style="font-size: 1.5em; font-weight: bold; color: #28a745;">'.price($stats->total_debit).'</div>';
-        print '<div style="color: #666;">Total Débits</div>';
+        print '<div class="opacitymedium">Total Débits</div>';
         print '</div>';
 
         print '<div style="text-align: center;">';
         print '<div style="font-size: 1.5em; font-weight: bold; color: #dc3545;">'.price($stats->total_credit).'</div>';
-        print '<div style="color: #666;">Total Crédits</div>';
+        print '<div class="opacitymedium">Total Crédits</div>';
         print '</div>';
 
         print '<div style="text-align: center;">';
@@ -75,7 +75,7 @@ if ($action == 'convert' && !empty($_FILES['payroll_file']['tmp_name'])) {
             print '<div style="font-size: 1.5em; font-weight: bold; color: #dc3545;">✗ Déséquilibré</div>';
             print '<div style="color: #dc3545;">Écart : '.price(abs($stats->balance)).'</div>';
         }
-        print '<div style="color: #666;">Balance</div>';
+        print '<div class="opacitymedium">Balance</div>';
         print '</div>';
 
         print '</div>';
@@ -103,7 +103,7 @@ if ($action == 'convert' && !empty($_FILES['payroll_file']['tmp_name'])) {
             print img_picto('', 'import', 'class="pictofixedwidth"').' Importer dans la Comptabilité';
             print '</a>';
             print '</div>';
-            print '<p style="margin-top: 10px; font-size: 0.9em; color: #666;"><strong>💡 Astuce :</strong> Téléchargez d\'abord le fichier CSV, puis cliquez sur "Importer dans la Comptabilité" pour accéder directement au module d\'import.</p>';
+            print '<p style="margin-top: 10px; font-size: 0.9em; color: var(--colortextbackhmenu);"><strong>💡 Astuce :</strong> Téléchargez d\'abord le fichier CSV, puis cliquez sur "Importer dans la Comptabilité" pour accéder directement au module d\'import.</p>';
             print '</div>';
 
             // Aperçu des premières lignes

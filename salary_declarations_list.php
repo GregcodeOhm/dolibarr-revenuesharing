@@ -275,22 +275,22 @@ try {
 
             print '<div style="text-align: center;">';
             print '<div style="font-size: 1.5em; font-weight: bold; color: #2d7d2d;">'.$stats->total_declarations.'</div>';
-            print '<div style="color: #666;">📋 Déclarations</div>';
+            print '<div class="opacitymedium">📋 Déclarations</div>';
             print '</div>';
 
             print '<div style="text-align: center;">';
             print '<div style="font-size: 1.5em; font-weight: bold; color: #28a745;">'.price($stats->total_cachets).'</div>';
-            print '<div style="color: #666;">💰 Total Cachets</div>';
+            print '<div class="opacitymedium">💰 Total Cachets</div>';
             print '</div>';
 
             print '<div style="text-align: center;">';
             print '<div style="font-size: 1.5em; font-weight: bold; color: #fd7e14;">'.price($stats->total_masse).'</div>';
-            print '<div style="color: #666;">💼 Masse Salariale</div>';
+            print '<div class="opacitymedium">💼 Masse Salariale</div>';
             print '</div>';
 
             print '<div style="text-align: center;">';
             print '<div style="font-size: 1.5em; font-weight: bold; color: #dc3545;">'.price($stats->total_solde).'</div>';
-            print '<div style="color: #666;">💸 Soldes Utilisés</div>';
+            print '<div class="opacitymedium">💸 Soldes Utilisés</div>';
             print '</div>';
 
             print '</div>';
@@ -298,7 +298,7 @@ try {
         }
 
     } else {
-        print '<div style="text-align: center; padding: 40px; color: #666;">';
+        print '<div style="text-align: center; padding: 40px; color: var(--colortextbackhmenu);">';
         print '<div style="font-size: 3em;">📝</div>';
         print '<h3>Aucune déclaration trouvée</h3>';
         print '<p>Commencez par créer votre première déclaration de salaires</p>';

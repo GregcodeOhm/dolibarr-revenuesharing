@@ -269,7 +269,7 @@ if ($contracts) {
             //if ($obj->status == 0 && $can_write) { // Seulement pour les brouillons
             //    print '<input type="checkbox" class="contract_checkbox" value="'.$obj->rowid.'" onchange="updateSelection()">';
             //} else {
-            //    print '<span style="color: #ccc;" title="Contrat non sélectionnable">-</span>'; // Indicateur pour contrats non sélectionnables
+            //    print '<span class="opacitymedium" title="Contrat non sélectionnable">-</span>'; // Indicateur pour contrats non sélectionnables
             //}
             //print '</td>';
 
@@ -301,7 +301,7 @@ if ($contracts) {
             if (isset($obj->type_contrat) && $obj->type_contrat == 'previsionnel') {
                 print '<br><small style="color: #007cba; font-style: italic;">'.img_picto('', 'info', 'class="pictofixedwidth"').' Contrat prévisionnel</small>';
             } elseif ($obj->project_ref || $obj->facture_ref) {
-                print '<br><small style="color: #666;">';
+                print '<br><small class="opacitymedium">';
                 if ($obj->project_ref) {
                     print img_picto('', 'project', 'class="pictofixedwidth"').' '.$obj->project_ref.' ';
                 }
