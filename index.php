@@ -35,9 +35,10 @@ if (!$has_permission) {
 $year = GETPOST('year', 'int') ? GETPOST('year', 'int') : date('Y');
 $filter_collaborator = GETPOST('filter_collaborator', 'int');
 
+llxHeader('', 'Revenue Sharing', '');
+
 // Load custom CSS
-$morecss = '/custom/revenuesharing/css/revenuesharing.css';
-llxHeader('', 'Revenue Sharing', '', '', 0, 0, '', '', '', '', $morecss);
+print '<link rel="stylesheet" type="text/css" href="'.dol_buildpath('/revenuesharing/css/revenuesharing.css', 1).'">';
 
 print load_fiche_titre('Revenue Sharing Dashboard', '', 'generic');
 
