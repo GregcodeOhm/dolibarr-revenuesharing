@@ -306,10 +306,10 @@ llxHeader('', $is_edit_mode ? 'Modifier Déclaration' : 'Nouvelle Déclaration',
 
 // Confirmation de suppression en haut
 if ($action == 'delete') {
-    print '<div class="center" style="margin: 20px 0; padding: 20px; background: #f8d7da; border: 2px solid #f5c6cb; border-radius: 8px;">';
-    print '<div style="font-size: 1.5em; color: #721c24; margin-bottom: 15px;"><strong>Confirmation de suppression</strong></div>';
+    print '<div class="center" style="margin: 20px 0; padding: 20px; background: var(--colorbacktabcard1); border: 2px solid #f5c6cb; border-radius: 8px;">';
+    print '<div style="font-size: 1.5em; color: var(--colortext); margin-bottom: 15px;"><strong>Confirmation de suppression</strong></div>';
     print '<div style="font-size: 1.1em; margin-bottom: 10px;">Êtes-vous sûr de vouloir supprimer cette déclaration de salaire ?</div>';
-    print '<div style="font-size: 1.0em; color: #721c24; margin-bottom: 15px;"><strong>Cette action est irréversible !</strong></div>';
+    print '<div style="font-size: 1.0em; color: var(--colortext); margin-bottom: 15px;"><strong>Cette action est irréversible !</strong></div>';
     print '<div style="display: flex; gap: 15px; justify-content: center;">';
     print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$id.'&action=delete&confirm=yes" class="button" style="background: #dc3545; color: white; padding: 10px 20px; font-size: 1.1em; border-radius: 5px;">Confirmer la suppression</a>';
     print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$id.'" class="button" style="background: #6c757d; color: white; padding: 10px 20px; font-size: 1.1em; border-radius: 5px;">Annuler</a>';

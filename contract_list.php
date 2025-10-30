@@ -230,7 +230,7 @@ try {
 
     $collaborators = $collaboratorRepo->findAll(['active' => 1]);
 } catch (Exception $e) {
-    print '<div style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24; padding: 15px; margin: 20px 0; border-radius: 4px;">';
+    print '<div style="background: var(--colorbacktabcard1); border: 1px solid #dc3545; color: var(--colortext); padding: 15px; margin: 20px 0; border-radius: 4px;">';
     print '<strong>⚠️ Erreur:</strong> '.htmlspecialchars($e->getMessage());
     print '</div>';
     llxFooter();
@@ -509,7 +509,7 @@ if ($contracts) {
     print '</div>';
 
 } else {
-    print '<div style="color: red; padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px;">';
+    print '<div style="color: red; padding: 15px; background: var(--colorbacktabcard1); border: 1px solid #f5c6cb; border-radius: 5px;">';
     print '<h3>Erreur de base de données</h3>';
     print '<p>Erreur : '.$db->lasterror().'</p>';
     print '</div>';

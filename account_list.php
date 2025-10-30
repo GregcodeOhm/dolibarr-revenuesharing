@@ -31,7 +31,7 @@ $sql_check = "SHOW TABLES LIKE '".MAIN_DB_PREFIX."revenuesharing_account_balance
 $resql_check = $db->query($sql_check);
 
 if (!$resql_check || $db->num_rows($resql_check) == 0) {
-    print '<div style="background: #f8d7da; padding: 20px; border-radius: 5px; color: #721c24; text-align: center;">';
+    print '<div style="background: var(--colorbacktabcard1); padding: 20px; border-radius: 5px; color: var(--colortext); text-align: center;">';
     print '<h3>Tables non créées</h3>';
     print '<p>Le système de comptes collaborateurs n\'est pas encore initialisé.</p>';
     print '<p>Contactez votre administrateur pour initialiser le système.</p>';
@@ -47,7 +47,7 @@ if (!$resql_check || $db->num_rows($resql_check) == 0) {
 
 // Formulaire de filtrage
 print '<div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin: 20px 0;">';
-print '<h4 style="margin: 0 0 10px 0; color: #495057;">Filtres</h4>';
+print '<h4 style="margin: 0 0 10px 0; color: var(--colortextbackhmenu);">Filtres</h4>';
 print '<form method="GET" action="'.$_SERVER["PHP_SELF"].'" style="display: flex; gap: 15px; align-items: end;">';
 
 // Filtre par année
@@ -238,7 +238,7 @@ try {
     }
     
     if ($num == 0) {
-        print '<tr><td colspan="7" class="center" style="padding: 20px; color: #666;">';
+        print '<tr><td colspan="7" class="center" style="padding: 20px; color: var(--colortextbackhmenu);">';
         print '<div style="font-size: 3em;"></div>';
         print '<h3>Aucun collaborateur trouvé</h3>';
         print '</td></tr>';
@@ -248,7 +248,7 @@ try {
     print '</div>';
 
 } catch (Exception $e) {
-    print '<div style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24; padding: 15px; margin: 20px 0; border-radius: 4px;">';
+    print '<div style="background: var(--colorbacktabcard1); border: 1px solid #dc3545; color: var(--colortext); padding: 15px; margin: 20px 0; border-radius: 4px;">';
     print '<strong>⚠️ Erreur:</strong> '.htmlspecialchars($e->getMessage());
     print '</div>';
     llxFooter();
@@ -259,7 +259,7 @@ try {
 // Section Export Global
 print '<div style="background: #f0f8ff; border: 1px solid #b8d4f0; border-radius: 8px; padding: 15px; margin: 20px 0;">';
 print '<h4 style="margin: 0 0 10px 0; color: #1e6ba8;">Export global des comptes</h4>';
-print '<p style="margin: 5px 0; color: #666;">Exportez la liste complète des comptes collaborateurs avec leurs soldes</p>';
+print '<p style="margin: 5px 0; color: var(--colortextbackhmenu);">Exportez la liste complète des comptes collaborateurs avec leurs soldes</p>';
 
 print '<form method="GET" action="export_all_accounts.php" style="margin-top: 10px;">';
 print '<input type="hidden" name="action" value="export">';
@@ -272,7 +272,7 @@ print '<button type="submit" name="format" value="csv" class="butAction" style="
 print '<button type="submit" name="format" value="pdf" class="butAction" style="background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;"> Export PDF</button>';
 print '</div>';
 if ($filter_year > 0) {
-    print '<p style="margin: 5px 0; color: #666; font-size: 0.9em;"><em>Export filtré pour l\'année '.$filter_year.'</em></p>';
+    print '<p style="margin: 5px 0; color: var(--colortextbackhmenu); font-size: 0.9em;"><em>Export filtré pour l\'année '.$filter_year.'</em></p>';
 }
 print '</form>';
 print '</div>';

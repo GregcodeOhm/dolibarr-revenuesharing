@@ -111,7 +111,7 @@ try {
         throw new Exception('Erreur lors de la récupération des déclarations de salaires');
     }
 } catch (Exception $e) {
-    print '<div style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24; padding: 15px; margin: 20px 0; border-radius: 4px;">';
+    print '<div style="background: var(--colorbacktabcard1); border: 1px solid #dc3545; color: var(--colortext); padding: 15px; margin: 20px 0; border-radius: 4px;">';
     print '<strong>⚠️ Erreur:</strong> '.htmlspecialchars($e->getMessage());
     print '</div>';
     llxFooter();
@@ -370,8 +370,8 @@ if ($salaires_info->nb_brouillons > 0 || $salaires_info->nb_valides > 0 || $sala
     
     // Section prévisionnel si il y a des brouillons ou validées
     if ($salaires_info->montant_previsionnel > 0) {
-        print '<div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 15px; margin: 15px 0;">';
-        print '<h4 style="margin: 0 0 10px 0; color: #721c24;">Impact Prévisionnel</h4>';
+        print '<div style="background: var(--colorbacktabcard1); border: 1px solid #f5c6cb; border-radius: 8px; padding: 15px; margin: 15px 0;">';
+        print '<h4 style="margin: 0 0 10px 0; color: var(--colortext);">Impact Prévisionnel</h4>';
         print '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">';
         
         print '<div style="text-align: center;">';

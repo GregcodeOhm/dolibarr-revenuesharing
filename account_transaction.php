@@ -134,7 +134,7 @@ if ($action == 'add' && $collaborator_id > 0 && $transaction_type && $amount != 
         print '</div>';
         
     } else {
-        print '<div style="background: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24;">';
+        print '<div style="background: var(--colorbacktabcard1); padding: 15px; border-radius: 5px; color: var(--colortext);">';
         print '<h4>Erreur lors de l\'enregistrement</h4>';
         print '<p>'.$db->lasterror().'</p>';
         print '</div>';

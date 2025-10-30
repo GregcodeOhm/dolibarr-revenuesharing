@@ -551,7 +551,7 @@ print '<style>
 }
 .section-title {
     font-weight: bold;
-    color: #495057;
+    color: var(--colortextbackhmenu);
     margin-bottom: 10px;
     font-size: 1.1em;
 }

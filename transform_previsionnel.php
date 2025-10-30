@@ -116,7 +116,7 @@ print '</div>';
 
 // Afficher les détails actuels du contrat
 print '<div style="background: #f8f9fa; border-radius: 8px; padding: 15px; margin: 15px 0;">';
-print '<h4 style="margin: 0 0 10px 0; color: #495057;">Contrat prévisionnel actuel</h4>';
+print '<h4 style="margin: 0 0 10px 0; color: var(--colortextbackhmenu);">Contrat prévisionnel actuel</h4>';
 print '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">';
 
 print '<div>';

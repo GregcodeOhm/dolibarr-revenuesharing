@@ -217,7 +217,7 @@ try {
     }
 
 } catch (Exception $e) {
-    print '<div style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24; padding: 15px; margin: 20px 0; border-radius: 4px;">';
+    print '<div style="background: var(--colorbacktabcard1); border: 1px solid #dc3545; color: var(--colortext); padding: 15px; margin: 20px 0; border-radius: 4px;">';
     print '<strong>⚠️ Erreur:</strong> '.htmlspecialchars($e->getMessage());
     print '</div>';
 }

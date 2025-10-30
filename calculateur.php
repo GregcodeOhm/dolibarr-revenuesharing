@@ -98,7 +98,7 @@ if ($action == 'calculate' && $prix_initial && $prix_cible) {
 
 // Affichage des erreurs
 if (!empty($errors)) {
-    print '<div style="background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 5px; margin: 15px 0;">';
+    print '<div style="background: var(--colorbacktabcard1); border: 1px solid #f5c6cb; color: var(--colortext); padding: 15px; border-radius: 5px; margin: 15px 0;">';
     print '<h4>Erreurs de validation :</h4>';
     print '<ul>';
     foreach ($errors as $error) {

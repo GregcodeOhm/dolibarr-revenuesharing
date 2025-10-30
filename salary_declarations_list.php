@@ -202,7 +202,7 @@ try {
                     print '<span style="background: #cce5f0; color: #007cba; padding: 3px 8px; border-radius: 12px; font-size: 0.9em;">💸 Payée</span>';
                     break;
                 default:
-                    print '<span style="background: #f8d7da; color: #721c24; padding: 3px 8px; border-radius: 12px; font-size: 0.9em;">❌ Inactive</span>';
+                    print '<span style="background: var(--colorbacktabcard1); color: var(--colortext); padding: 3px 8px; border-radius: 12px; font-size: 0.9em;">❌ Inactive</span>';
             }
             print '</td>';
 
@@ -307,7 +307,7 @@ try {
     }
 
 } catch (Exception $e) {
-    print '<div style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24; padding: 15px; margin: 20px 0; border-radius: 4px;">';
+    print '<div style="background: var(--colorbacktabcard1); border: 1px solid #dc3545; color: var(--colortext); padding: 15px; margin: 20px 0; border-radius: 4px;">';
     print '<strong>⚠️ Erreur:</strong> '.htmlspecialchars($e->getMessage());
     print '</div>';
 }
