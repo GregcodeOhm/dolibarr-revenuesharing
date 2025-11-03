@@ -167,12 +167,33 @@ class CollaboratorRepository
         }
 
         $sql = "SELECT c.rowid, c.label, c.fk_user, u.firstname, u.lastname,
-                ab.total_credits, ab.total_debits, ab.current_balance, ab.last_transaction_date,
+                ab.last_transaction_date,
+                -- Total credits (toutes années)
+                (SELECT COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END), 0)
+                 FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+                 WHERE t.fk_collaborator = c.rowid AND t.status = 1) as total_credits,
+                -- Total debits (toutes années) incluant salaires
+                (SELECT COALESCE(SUM(CASE WHEN t.amount < 0 THEN ABS(t.amount) ELSE 0 END), 0)
+                 FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+                 WHERE t.fk_collaborator = c.rowid AND t.status = 1)
+                 + (SELECT COALESCE(SUM(sd.solde_utilise), 0)
+                    FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration sd
+                    WHERE sd.fk_collaborator = c.rowid AND sd.status = 3) as total_debits,
+                -- Solde actuel (toutes années) incluant salaires
+                (SELECT COALESCE(SUM(t.amount), 0)
+                 FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+                 WHERE t.fk_collaborator = c.rowid AND t.status = 1)
+                 - (SELECT COALESCE(SUM(sd.solde_utilise), 0)
+                    FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration sd
+                    WHERE sd.fk_collaborator = c.rowid AND sd.status = 3) as current_balance,
+                -- Nb transactions (filtrées par année si nécessaire)
                 (SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
                  WHERE t.fk_collaborator = c.rowid AND t.status = 1".$year_filter_sql.") as nb_transactions,
+                -- Year credits (filtrés par année si nécessaire)
                 (SELECT COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END), 0)
                  FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
                  WHERE t.fk_collaborator = c.rowid AND t.status = 1".$year_filter_sql.") as year_credits,
+                -- Year debits (filtrés par année si nécessaire) incluant salaires
                 (SELECT COALESCE(SUM(CASE WHEN t.amount < 0 THEN ABS(t.amount) ELSE 0 END), 0)
                  FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
                  WHERE t.fk_collaborator = c.rowid AND t.status = 1".$year_filter_sql.")
@@ -180,6 +201,7 @@ class CollaboratorRepository
                     FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration sd
                     WHERE sd.fk_collaborator = c.rowid AND sd.status = 3"
                     .((!empty($filters['year'])) ? " AND sd.declaration_year = ".(int)$filters['year'] : "").") as year_debits,
+                -- Year balance (filtrés par année si nécessaire) incluant salaires
                 (SELECT COALESCE(SUM(t.amount), 0)
                  FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
                  WHERE t.fk_collaborator = c.rowid AND t.status = 1".$year_filter_sql.")
