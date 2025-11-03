@@ -175,10 +175,18 @@ class CollaboratorRepository
                  WHERE t.fk_collaborator = c.rowid AND t.status = 1".$year_filter_sql.") as year_credits,
                 (SELECT COALESCE(SUM(CASE WHEN t.amount < 0 THEN ABS(t.amount) ELSE 0 END), 0)
                  FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
-                 WHERE t.fk_collaborator = c.rowid AND t.status = 1".$year_filter_sql.") as year_debits,
+                 WHERE t.fk_collaborator = c.rowid AND t.status = 1".$year_filter_sql.")
+                 + (SELECT COALESCE(SUM(sd.solde_utilise), 0)
+                    FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration sd
+                    WHERE sd.fk_collaborator = c.rowid AND sd.status = 3"
+                    .((!empty($filters['year'])) ? " AND sd.declaration_year = ".(int)$filters['year'] : "").") as year_debits,
                 (SELECT COALESCE(SUM(t.amount), 0)
                  FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
-                 WHERE t.fk_collaborator = c.rowid AND t.status = 1".$year_filter_sql.") as year_balance";
+                 WHERE t.fk_collaborator = c.rowid AND t.status = 1".$year_filter_sql.")
+                 - (SELECT COALESCE(SUM(sd.solde_utilise), 0)
+                    FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration sd
+                    WHERE sd.fk_collaborator = c.rowid AND sd.status = 3"
+                    .((!empty($filters['year'])) ? " AND sd.declaration_year = ".(int)$filters['year'] : "").") as year_balance";
 
         $sql .= " FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator c";
         $sql .= " LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = c.fk_user";
