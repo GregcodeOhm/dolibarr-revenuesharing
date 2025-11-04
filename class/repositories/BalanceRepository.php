@@ -347,29 +347,57 @@ class BalanceRepository
         }
 
         if ($filter_year > 0) {
-            // Statistiques filtrées par année
+            // Statistiques filtrées par année - utiliser date de facture et inclure salaires
             $sql_stats = "SELECT
                 COUNT(DISTINCT c.rowid) as nb_collaborators,
                 COALESCE(SUM((SELECT COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END), 0)
                              FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
-                             WHERE t.fk_collaborator = c.rowid AND t.status = 1 AND YEAR(t.transaction_date) = ".(int)$filter_year.")), 0) as total_all_credits,
+                             LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
+                             LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
+                             WHERE t.fk_collaborator = c.rowid AND t.status = 1
+                             AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) = ".(int)$filter_year.")), 0) as total_all_credits,
                 COALESCE(SUM((SELECT COALESCE(SUM(CASE WHEN t.amount < 0 THEN ABS(t.amount) ELSE 0 END), 0)
                              FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
-                             WHERE t.fk_collaborator = c.rowid AND t.status = 1 AND YEAR(t.transaction_date) = ".(int)$filter_year.")), 0) as total_all_debits,
+                             LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
+                             LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
+                             WHERE t.fk_collaborator = c.rowid AND t.status = 1
+                             AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) = ".(int)$filter_year.")), 0)
+                + COALESCE(SUM((SELECT COALESCE(SUM(sd.solde_utilise), 0)
+                               FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration sd
+                               WHERE sd.fk_collaborator = c.rowid AND sd.status = 3
+                               AND sd.declaration_year = ".(int)$filter_year.")), 0) as total_all_debits,
                 COALESCE(SUM((SELECT COALESCE(SUM(t.amount), 0)
                              FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
-                             WHERE t.fk_collaborator = c.rowid AND t.status = 1 AND YEAR(t.transaction_date) = ".(int)$filter_year.")), 0) as total_balance
+                             LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
+                             LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
+                             WHERE t.fk_collaborator = c.rowid AND t.status = 1
+                             AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) = ".(int)$filter_year.")), 0)
+                - COALESCE(SUM((SELECT COALESCE(SUM(sd.solde_utilise), 0)
+                               FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration sd
+                               WHERE sd.fk_collaborator = c.rowid AND sd.status = 3
+                               AND sd.declaration_year = ".(int)$filter_year.")), 0) as total_balance
                 FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator c
                 WHERE c.active = 1";
         } else {
-            // Statistiques globales (non filtrées)
+            // Statistiques globales (non filtrées) - calculer dynamiquement avec salaires
             $sql_stats = "SELECT
                 COUNT(DISTINCT c.rowid) as nb_collaborators,
-                COALESCE(SUM(ab.total_credits), 0) as total_all_credits,
-                COALESCE(SUM(ab.total_debits), 0) as total_all_debits,
-                COALESCE(SUM(ab.current_balance), 0) as total_balance
+                COALESCE(SUM((SELECT COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END), 0)
+                             FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+                             WHERE t.fk_collaborator = c.rowid AND t.status = 1)), 0) as total_all_credits,
+                COALESCE(SUM((SELECT COALESCE(SUM(CASE WHEN t.amount < 0 THEN ABS(t.amount) ELSE 0 END), 0)
+                             FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+                             WHERE t.fk_collaborator = c.rowid AND t.status = 1)), 0)
+                + COALESCE(SUM((SELECT COALESCE(SUM(sd.solde_utilise), 0)
+                               FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration sd
+                               WHERE sd.fk_collaborator = c.rowid AND sd.status = 3)), 0) as total_all_debits,
+                COALESCE(SUM((SELECT COALESCE(SUM(t.amount), 0)
+                             FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+                             WHERE t.fk_collaborator = c.rowid AND t.status = 1)), 0)
+                - COALESCE(SUM((SELECT COALESCE(SUM(sd.solde_utilise), 0)
+                               FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration sd
+                               WHERE sd.fk_collaborator = c.rowid AND sd.status = 3)), 0) as total_balance
                 FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator c
-                LEFT JOIN ".MAIN_DB_PREFIX."revenuesharing_account_balance ab ON ab.fk_collaborator = c.rowid
                 WHERE c.active = 1";
         }
 
