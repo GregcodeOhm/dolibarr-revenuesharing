@@ -157,6 +157,8 @@ try {
     print '<tr class="liste_titre">';
     print '<th>Collaborateur</th>';
     if ($filter_year > 0) {
+        print '<th class="center">Crédits '.($filter_year - 1).'</th>';
+        print '<th class="center">Solde '.($filter_year - 1).'</th>';
         print '<th class="center">Crédits '.$filter_year.'</th>';
         print '<th class="center">Débits '.$filter_year.'</th>';
         print '<th class="center">Solde '.$filter_year.'</th>';
@@ -185,6 +187,26 @@ try {
             print '<br><small class="opacitymedium">'.$obj->firstname.' '.$obj->lastname.'</small>';
         }
         print '</td>';
+
+        // Si filtre année actif, afficher d'abord les données N-1
+        if ($filter_year > 0) {
+            // Crédits N-1
+            print '<td class="center">';
+            if ($obj->prev_year_credits > 0) {
+                print '<span class="badge badge-success" style="padding: 3px 6px; opacity: 0.7;">'.price($obj->prev_year_credits).'</span>';
+            } else {
+                print '<span class="opacitymedium">0,00 €</span>';
+            }
+            print '</td>';
+
+            // Solde N-1
+            print '<td class="center">';
+            $prev_balance_badge = ($obj->prev_year_balance >= 0) ? 'badge-success' : 'badge-danger';
+            print '<span class="badge '.$prev_balance_badge.'" style="padding: 4px 8px; font-size: 0.95em; opacity: 0.7;">';
+            print price($obj->prev_year_balance);
+            print '</span>';
+            print '</td>';
+        }
 
         // Crédits (avec filtre année)
         print '<td class="center">';
