@@ -22,6 +22,11 @@ $balanceRepo = new BalanceRepository($db, $cache);
 $filter_collaborator = GETPOST('filter_collaborator', 'int');
 $filter_year = GETPOST('filter_year', 'int');
 
+// Si aucune année n'est spécifiée, utiliser l'année en cours par défaut
+if (!$filter_year && !isset($_GET['filter_year'])) {
+    $filter_year = (int)date('Y');
+}
+
 llxHeader('', 'Comptes Collaborateurs', '');
 
 print load_fiche_titre('Comptes Collaborateurs', '', 'generic');

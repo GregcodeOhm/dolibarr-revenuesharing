@@ -161,9 +161,10 @@ class CollaboratorRepository
      */
     public function findAllWithBalances($filters = [])
     {
+        // Construire le filtre année basé sur la date de facture (comme BalanceRepository)
         $year_filter_sql = "";
         if (!empty($filters['year'])) {
-            $year_filter_sql = " AND YEAR(t.transaction_date) = ".(int)$filters['year'];
+            $year_filter_sql = " AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) = ".(int)$filters['year'];
         }
 
         $sql = "SELECT c.rowid, c.label, c.fk_user, u.firstname, u.lastname,
@@ -187,15 +188,22 @@ class CollaboratorRepository
                     FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration sd
                     WHERE sd.fk_collaborator = c.rowid AND sd.status = 3) as current_balance,
                 -- Nb transactions (filtrées par année si nécessaire)
-                (SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+                (SELECT COUNT(*)
+                 FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+                 LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
+                 LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
                  WHERE t.fk_collaborator = c.rowid AND t.status = 1".$year_filter_sql.") as nb_transactions,
                 -- Year credits (filtrés par année si nécessaire)
                 (SELECT COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END), 0)
                  FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+                 LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
+                 LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
                  WHERE t.fk_collaborator = c.rowid AND t.status = 1".$year_filter_sql.") as year_credits,
                 -- Year debits (filtrés par année si nécessaire) incluant salaires
                 (SELECT COALESCE(SUM(CASE WHEN t.amount < 0 THEN ABS(t.amount) ELSE 0 END), 0)
                  FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+                 LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
+                 LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
                  WHERE t.fk_collaborator = c.rowid AND t.status = 1".$year_filter_sql.")
                  + (SELECT COALESCE(SUM(sd.solde_utilise), 0)
                     FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration sd
@@ -204,6 +212,8 @@ class CollaboratorRepository
                 -- Year balance (filtrés par année si nécessaire) incluant salaires
                 (SELECT COALESCE(SUM(t.amount), 0)
                  FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+                 LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
+                 LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
                  WHERE t.fk_collaborator = c.rowid AND t.status = 1".$year_filter_sql.")
                  - (SELECT COALESCE(SUM(sd.solde_utilise), 0)
                     FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration sd
