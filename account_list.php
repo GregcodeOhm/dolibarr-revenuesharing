@@ -159,12 +159,13 @@ try {
     if ($filter_year > 0) {
         print '<th class="center">Crédits '.$filter_year.'</th>';
         print '<th class="center">Débits '.$filter_year.'</th>';
-        print '<th class="center"> Solde '.$filter_year.'</th>';
+        print '<th class="center">Solde '.$filter_year.'</th>';
+        print '<th class="center">Solde Total</th>';
         print '<th class="center">Transactions '.$filter_year.'</th>';
     } else {
         print '<th class="center">Total Crédits</th>';
         print '<th class="center">Total Débits</th>';
-        print '<th class="center"> Solde Actuel</th>';
+        print '<th class="center">Solde Actuel</th>';
         print '<th class="center">Transactions</th>';
     }
     print '<th class="center">Dernière Op.</th>';
@@ -213,6 +214,16 @@ try {
         print price($balance_value);
         print '</span>';
         print '</td>';
+
+        // Solde Total (uniquement si filtre année actif)
+        if ($filter_year > 0) {
+            print '<td class="center">';
+            $total_balance_badge = ($obj->current_balance >= 0) ? 'badge-success' : 'badge-danger';
+            print '<span class="badge '.$total_balance_badge.'" style="padding: 4px 8px; font-size: 1em;">';
+            print price($obj->current_balance);
+            print '</span>';
+            print '</td>';
+        }
 
         // Nb transactions (avec filtre année)
         print '<td class="center">';
