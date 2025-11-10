@@ -224,25 +224,42 @@ if ($collaborator_id > 0) {
             print '</div>';
             print '</div>';
 
-            // JavaScript pour générer le HTML
-            print '<script>';
-            print 'document.getElementById("generateEmailBtn").addEventListener("click", function() {';
-            print '    var html = generateEmailHtml();';
-            print '    document.getElementById("emailContent").innerHTML = html;';
-            print '    document.getElementById("htmlCode").value = html;';
-            print '    document.getElementById("emailPreview").style.display = "block";';
-            print '    document.getElementById("copyHtmlBtn").style.display = "inline-block";';
-            print '});';
+            // Générer le HTML de l'email côté PHP
+            $email_html_rows = '';
+            foreach ($invoices as $invoice) {
+                $today = time();
+                $due_date = $db->jdate($invoice->date_lim_reglement);
+                $days_late = 0;
+                $row_bg = '';
 
-            print 'document.getElementById("copyHtmlBtn").addEventListener("click", function() {';
-            print '    var htmlCode = document.getElementById("htmlCode");';
-            print '    htmlCode.select();';
-            print '    document.execCommand("copy");';
-            print '    alert("HTML copié dans le presse-papiers !");';
-            print '});';
+                if ($due_date) {
+                    $days_late = floor(($today - $due_date) / 86400);
+                    if ($days_late > 60) {
+                        $row_bg = ' style="background: #ffebee;"';
+                    } elseif ($days_late > 30) {
+                        $row_bg = ' style="background: #fff3e0;"';
+                    } elseif ($days_late > 0) {
+                        $row_bg = ' style="background: #fff9c4;"';
+                    }
+                }
 
-            print 'function generateEmailHtml() {';
-            print '    var html = `<!DOCTYPE html>
+                $days_display = '-';
+                if ($days_late > 0) {
+                    $days_display = '<strong style="color: #d32f2f;">'.$days_late.' jours</strong>';
+                }
+
+                $email_html_rows .= '
+                <tr'.$row_bg.'>
+                    <td style="padding: 10px; border: 1px solid #dee2e6;">'.$invoice->ref.'</td>
+                    <td style="padding: 10px; border: 1px solid #dee2e6;">'.dol_escape_htmltag($invoice->client_name).'</td>
+                    <td style="padding: 10px; border: 1px solid #dee2e6;">'.dol_print_date($db->jdate($invoice->datef), 'day').'</td>
+                    <td style="padding: 10px; border: 1px solid #dee2e6;">'.($due_date ? dol_print_date($due_date, 'day') : '-').'</td>
+                    <td style="padding: 10px; text-align: right; border: 1px solid #dee2e6;">'.$days_display.'</td>
+                    <td style="padding: 10px; text-align: right; border: 1px solid #dee2e6;"><strong>'.price($invoice->total_ttc, 0, '', 1, -1, -1, 'EUR').'</strong></td>
+                </tr>';
+            }
+
+            $email_html_template = '<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -255,7 +272,7 @@ if ($collaborator_id > 0) {
     </div>
 
     <div style="background: #f8f9fa; padding: 30px; border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 8px 8px;">
-        <p>Bonjour '.dol_escape_js($collaborator_fullname).',</p>
+        <p>Bonjour '.dol_escape_htmltag($collaborator_fullname).',</p>
 
         <p>Nous vous informons que vous avez actuellement <strong>'.$num.' facture'.($num > 1 ? 's' : '').' impayée'.($num > 1 ? 's' : '').'</strong> pour un montant total de <strong>'.price($total_ttc_unpaid, 0, '', 1, -1, -1, 'EUR').'</strong>.</p>
 
@@ -272,41 +289,7 @@ if ($collaborator_id > 0) {
                     <th style="padding: 12px; text-align: right; border: 1px solid #dee2e6;">Montant TTC</th>
                 </tr>
             </thead>
-            <tbody>`;
-
-            // Ajouter les lignes de factures
-            $db->data_seek($resql, 0);
-            foreach ($invoices as $invoice) {
-                $today = time();
-                $due_date = $db->jdate($invoice->date_lim_reglement);
-                $days_late = 0;
-                $row_style = '';
-
-                if ($due_date) {
-                    $days_late = floor(($today - $due_date) / 86400);
-                    if ($days_late > 60) {
-                        $row_style = ' style="background: #ffebee;"';
-                    } elseif ($days_late > 30) {
-                        $row_style = ' style="background: #fff3e0;"';
-                    } elseif ($days_late > 0) {
-                        $row_style = ' style="background: #fff9c4;"';
-                    }
-                }
-
-                $days_late_text = ($days_late > 0) ? $days_late.' jours' : '-';
-
-                print 'html += `
-                <tr'.$row_style.'>
-                    <td style="padding: 10px; border: 1px solid #dee2e6;">'.$invoice->ref.'</td>
-                    <td style="padding: 10px; border: 1px solid #dee2e6;">'.dol_escape_js($invoice->client_name).'</td>
-                    <td style="padding: 10px; border: 1px solid #dee2e6;">'.dol_print_date($db->jdate($invoice->datef), 'day').'</td>
-                    <td style="padding: 10px; border: 1px solid #dee2e6;">'.($due_date ? dol_print_date($due_date, 'day') : '-').'</td>
-                    <td style="padding: 10px; text-align: right; border: 1px solid #dee2e6;">'.($days_late > 0 ? '<strong style="color: #d32f2f;">'.$days_late_text.'</strong>' : '-').'</td>
-                    <td style="padding: 10px; text-align: right; border: 1px solid #dee2e6;"><strong>'.price($invoice->total_ttc, 0, '', 1, -1, -1, 'EUR').'</strong></td>
-                </tr>`;';
-            }
-
-            print 'html += `
+            <tbody>'.$email_html_rows.'
             </tbody>
             <tfoot>
                 <tr style="background: #f8f9fa; font-weight: bold;">
@@ -329,11 +312,28 @@ if ($collaborator_id > 0) {
         <p>Ce message a été généré automatiquement le '.dol_print_date(time(), 'dayhour').'</p>
     </div>
 </body>
-</html>`;';
+</html>';
 
-            print '    return html;';
-            print '}';
-            print '</script>';
+            // JavaScript pour gérer l'affichage
+            ?>
+            <script>
+            var emailHtmlTemplate = <?php echo json_encode($email_html_template); ?>;
+
+            document.getElementById("generateEmailBtn").addEventListener("click", function() {
+                document.getElementById("emailContent").innerHTML = emailHtmlTemplate;
+                document.getElementById("htmlCode").value = emailHtmlTemplate;
+                document.getElementById("emailPreview").style.display = "block";
+                document.getElementById("copyHtmlBtn").style.display = "inline-block";
+            });
+
+            document.getElementById("copyHtmlBtn").addEventListener("click", function() {
+                var htmlCode = document.getElementById("htmlCode");
+                htmlCode.select();
+                document.execCommand("copy");
+                alert("HTML copié dans le presse-papiers !");
+            });
+            </script>
+            <?php
 
         } else {
             print '<div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 20px; border-radius: 5px; text-align: center;">';
