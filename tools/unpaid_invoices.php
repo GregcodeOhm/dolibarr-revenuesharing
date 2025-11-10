@@ -226,20 +226,35 @@ function generateEmailHTML($collaborator_fullname, $num, $total_ttc_unpaid, $tot
             border-collapse: collapse;
             background: white;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            min-width: 600px;
+            min-width: 700px;
+            table-layout: fixed;
         }
         th, td {
-            padding: 12px;
+            padding: 12px 8px;
             border: 1px solid #dee2e6;
             text-align: left;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         th {
             background: #667eea;
             color: white;
             font-weight: bold;
+            white-space: nowrap;
         }
+        /* Largeurs de colonnes spécifiques */
+        th:nth-child(1), td:nth-child(1) { width: 10%; } /* Référence */
+        th:nth-child(2), td:nth-child(2) { width: 20%; } /* Client */
+        th:nth-child(3), td:nth-child(3) { width: 10%; } /* Date */
+        th:nth-child(4), td:nth-child(4) { width: 10%; } /* Échéance */
+        th:nth-child(5), td:nth-child(5) { width: 10%; min-width: 80px; } /* Retard */
+        th:nth-child(6), td:nth-child(6) { width: 13%; min-width: 100px; } /* Total TTC */
+        th:nth-child(7), td:nth-child(7) { width: 15%; min-width: 110px; } /* Reste à payer */
+        th:nth-child(8), td:nth-child(8) { width: 12%; } /* Statut */
+
         .text-right {
             text-align: right;
+            white-space: nowrap;
         }
         .text-center {
             text-align: center;
@@ -703,20 +718,35 @@ if ($collaborator_id > 0) {
             border-collapse: collapse;
             background: white;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            min-width: 600px;
+            min-width: 700px;
+            table-layout: fixed;
         }
         th, td {
-            padding: 12px;
+            padding: 12px 8px;
             border: 1px solid #dee2e6;
             text-align: left;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         th {
             background: #667eea;
             color: white;
             font-weight: bold;
+            white-space: nowrap;
         }
+        /* Largeurs de colonnes spécifiques */
+        th:nth-child(1), td:nth-child(1) { width: 10%; } /* Référence */
+        th:nth-child(2), td:nth-child(2) { width: 20%; } /* Client */
+        th:nth-child(3), td:nth-child(3) { width: 10%; } /* Date */
+        th:nth-child(4), td:nth-child(4) { width: 10%; } /* Échéance */
+        th:nth-child(5), td:nth-child(5) { width: 10%; min-width: 80px; } /* Retard */
+        th:nth-child(6), td:nth-child(6) { width: 13%; min-width: 100px; } /* Total TTC */
+        th:nth-child(7), td:nth-child(7) { width: 15%; min-width: 110px; } /* Reste à payer */
+        th:nth-child(8), td:nth-child(8) { width: 12%; } /* Statut */
+
         .text-right {
             text-align: right;
+            white-space: nowrap;
         }
         .text-center {
             text-align: center;
