@@ -75,6 +75,8 @@ class ExportAccount
             $this->db->free($resql_salaries);
             // Le solde actuel = solde des transactions - salaires payés
             $this->balance_info->current_balance = $this->balance_info->transactions_balance - $total_salaries;
+            // Les salaires payés doivent être ajoutés aux débits totaux
+            $this->balance_info->total_debits += $total_salaries;
         } else {
             $this->balance_info->current_balance = $this->balance_info->transactions_balance;
         }
