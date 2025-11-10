@@ -64,6 +64,11 @@ print '<a href="'.dol_buildpath('/revenuesharing/tools/analyze_stu_discrepancy.p
 print '📊 Analyser les écarts CA STU';
 print '</a>';
 print ' <span style="margin-left: 10px; color: #666;">Comparez les factures STU avec les contrats revenuesharing</span>';
+print '<br><br>';
+print '<a href="'.dol_buildpath('/revenuesharing/tools/unpaid_invoices.php', 1).'" class="button" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">';
+print '📧 Factures impayées par collaborateur';
+print '</a>';
+print ' <span style="margin-left: 10px; color: #666;">Générez un email de relance pour les factures impayées</span>';
 print '</div>';
 
 // Statistiques générales (via repositories avec cache)
