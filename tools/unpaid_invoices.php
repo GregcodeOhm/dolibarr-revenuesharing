@@ -243,12 +243,12 @@ function generateEmailHTML($collaborator_fullname, $num, $total_ttc_unpaid, $tot
             white-space: nowrap;
         }
         /* Largeurs de colonnes spécifiques */
-        th:nth-child(1), td:nth-child(1) { width: 10%; } /* Référence */
-        th:nth-child(2), td:nth-child(2) { width: 18%; } /* Client */
+        th:nth-child(1), td:nth-child(1) { width: 8%; } /* Réf. */
+        th:nth-child(2), td:nth-child(2) { width: 22%; } /* Client */
         th:nth-child(3), td:nth-child(3) { width: 10%; } /* Date */
-        th:nth-child(4), td:nth-child(4) { width: 10%; } /* Échéance */
+        th:nth-child(4), td:nth-child(4) { width: 8%; } /* Éch. */
         th:nth-child(5), td:nth-child(5) { width: 9%; min-width: 80px; } /* Retard */
-        th:nth-child(6), td:nth-child(6) { width: 13%; min-width: 100px; } /* Total TTC */
+        th:nth-child(6), td:nth-child(6) { width: 13%; min-width: 100px; } /* Montant TTC */
         th:nth-child(7), td:nth-child(7) { width: 14%; min-width: 110px; } /* Reste à payer */
         th:nth-child(8), td:nth-child(8) { width: 16%; min-width: 130px; } /* Statut */
 
@@ -322,12 +322,12 @@ function generateEmailHTML($collaborator_fullname, $num, $total_ttc_unpaid, $tot
                 <table>
                     <thead>
                         <tr>
-                            <th>Référence</th>
+                            <th>Réf.</th>
                             <th>Client</th>
                             <th>Date</th>
-                            <th>Échéance</th>
+                            <th>Éch.</th>
                             <th class="text-right">Retard</th>
-                            <th class="text-right">Total TTC</th>
+                            <th class="text-right">Montant TTC</th>
                             <th class="text-right">Reste à payer</th>
                             <th class="text-center">Statut</th>
                         </tr>
@@ -522,12 +522,12 @@ if ($collaborator_id > 0) {
             print '<div style="background: white; border: 1px solid #dee2e6; border-radius: 5px; overflow: hidden; margin-bottom: 20px;">';
             print '<table class="tagtable liste" style="width: 100%;">';
             print '<tr class="liste_titre">';
-            print '<th>Référence</th>';
+            print '<th>Réf.</th>';
             print '<th>Client</th>';
             print '<th>Date facture</th>';
-            print '<th>Échéance</th>';
-            print '<th class="right">Retard (jours)</th>';
-            print '<th class="right">Total TTC</th>';
+            print '<th>Éch.</th>';
+            print '<th class="right">Retard (j)</th>';
+            print '<th class="right">Montant TTC</th>';
             print '<th class="right">Reste à payer</th>';
             print '<th>Statut</th>';
             print '</tr>';
@@ -735,12 +735,12 @@ if ($collaborator_id > 0) {
             white-space: nowrap;
         }
         /* Largeurs de colonnes spécifiques */
-        th:nth-child(1), td:nth-child(1) { width: 10%; } /* Référence */
-        th:nth-child(2), td:nth-child(2) { width: 18%; } /* Client */
+        th:nth-child(1), td:nth-child(1) { width: 8%; } /* Réf. */
+        th:nth-child(2), td:nth-child(2) { width: 22%; } /* Client */
         th:nth-child(3), td:nth-child(3) { width: 10%; } /* Date */
-        th:nth-child(4), td:nth-child(4) { width: 10%; } /* Échéance */
+        th:nth-child(4), td:nth-child(4) { width: 8%; } /* Éch. */
         th:nth-child(5), td:nth-child(5) { width: 9%; min-width: 80px; } /* Retard */
-        th:nth-child(6), td:nth-child(6) { width: 13%; min-width: 100px; } /* Total TTC */
+        th:nth-child(6), td:nth-child(6) { width: 13%; min-width: 100px; } /* Montant TTC */
         th:nth-child(7), td:nth-child(7) { width: 14%; min-width: 110px; } /* Reste à payer */
         th:nth-child(8), td:nth-child(8) { width: 16%; min-width: 130px; } /* Statut */
 
@@ -815,12 +815,12 @@ if ($collaborator_id > 0) {
                 <table>
                     <thead>
                         <tr>
-                            <th>Référence</th>
+                            <th>Réf.</th>
                             <th>Client</th>
                             <th>Date</th>
-                            <th>Échéance</th>
+                            <th>Éch.</th>
                             <th class="text-right">Retard</th>
-                            <th class="text-right">Total TTC</th>
+                            <th class="text-right">Montant TTC</th>
                             <th class="text-right">Reste à payer</th>
                             <th class="text-center">Statut</th>
                         </tr>
