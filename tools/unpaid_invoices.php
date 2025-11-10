@@ -19,6 +19,7 @@ if (!$res) {
 }
 
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/CMailFile.class.php';
 dol_include_once('/revenuesharing/class/revenuesharing_collaborator.class.php');
 
 // Security check
@@ -30,6 +31,49 @@ $form = new Form($db);
 $collaborator_id = GETPOST('collaborator_id', 'int');
 $action = GETPOST('action', 'alpha');
 $year = GETPOST('year', 'int') ? GETPOST('year', 'int') : date('Y');
+
+// Action : envoyer l'email
+if ($action == 'send_email' && $collaborator_id > 0) {
+    $email_to = GETPOST('email_to', 'email');
+    $email_subject = GETPOST('email_subject', 'restricthtml');
+    $email_body = GETPOST('email_body', 'restricthtml');
+
+    if (!empty($email_to) && !empty($email_body)) {
+        // Configuration de l'expéditeur
+        $from = $conf->global->MAIN_MAIL_EMAIL_FROM;
+        $from_name = $conf->global->MAIN_INFO_SOCIETE_NOM;
+
+        // Créer l'objet mail
+        $mail = new CMailFile(
+            $email_subject,
+            $email_to,
+            $from,
+            $email_body,
+            array(),  // attachments
+            array(),  // files_mime
+            array(),  // file_names
+            '',       // cc
+            '',       // bcc
+            0,        // deliveryreceipt
+            -1,       // msgishtml (1 = HTML, 0 = text)
+            '',       // errors_to
+            '',       // css
+            '',       // trackid
+            '',       // moreinheader
+            'html'    // sendcontext
+        );
+
+        $result = $mail->sendfile();
+
+        if ($result) {
+            setEventMessages('Email envoyé avec succès à '.$email_to, null, 'mesgs');
+        } else {
+            setEventMessages('Erreur lors de l\'envoi de l\'email : '.$mail->error, null, 'errors');
+        }
+    } else {
+        setEventMessages('Email ou contenu manquant', null, 'errors');
+    }
+}
 
 llxHeader('', 'Factures impayées par collaborateur');
 
@@ -257,16 +301,45 @@ if ($collaborator_id > 0) {
             print '</table>';
             print '</div>';
 
-            // Bouton pour générer le HTML
+            // Section d'envoi d'email
             print '<div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 5px; padding: 20px; margin-top: 20px;">';
-            print '<h3 style="margin-top: 0;">📧 Générer l\'email pour le collaborateur</h3>';
-            print '<button id="generateEmailBtn" class="button" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 10px 20px; cursor: pointer;">Générer le contenu HTML</button>';
-            print ' <button id="copyHtmlBtn" class="button" style="display: none; background: #4caf50; color: white; border: none; padding: 10px 20px; cursor: pointer;">📋 Copier le HTML</button>';
+            print '<h3 style="margin-top: 0;">📧 Envoyer l\'email au collaborateur</h3>';
+
+            print '<button id="generateEmailBtn" class="button" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 10px 20px; cursor: pointer;">Générer l\'aperçu</button>';
+
             print '<div id="emailPreview" style="margin-top: 20px; display: none;">';
             print '<h4>Aperçu de l\'email :</h4>';
-            print '<div id="emailContent" style="border: 2px solid #90caf9; padding: 20px; background: white; border-radius: 5px;"></div>';
-            print '<h4 style="margin-top: 20px;">Code HTML à copier :</h4>';
-            print '<textarea id="htmlCode" style="width: 100%; height: 200px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;"></textarea>';
+            print '<div id="emailContent" style="border: 2px solid #90caf9; padding: 20px; background: white; border-radius: 5px; max-height: 400px; overflow-y: auto;"></div>';
+
+            // Formulaire d'envoi
+            print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'" style="margin-top: 20px; background: #f8f9fa; padding: 20px; border-radius: 5px;">';
+            print '<input type="hidden" name="token" value="'.newToken().'">';
+            print '<input type="hidden" name="action" value="send_email">';
+            print '<input type="hidden" name="collaborator_id" value="'.$collaborator_id.'">';
+            print '<input type="hidden" name="year" value="'.$year.'">';
+            print '<input type="hidden" name="email_body" id="email_body_hidden" value="">';
+
+            print '<table class="border centpercent">';
+            print '<tr>';
+            print '<td width="20%"><label>Email destinataire *</label></td>';
+            print '<td><input type="email" name="email_to" value="'.dol_escape_htmltag($collaborator_email).'" required class="flat minwidth300" placeholder="email@example.com"></td>';
+            print '</tr>';
+            print '<tr>';
+            print '<td><label>Objet *</label></td>';
+            print '<td><input type="text" name="email_subject" value="État des factures impayées - '.$collaborator_fullname.'" required class="flat minwidth300"></td>';
+            print '</tr>';
+            print '</table>';
+
+            print '<div style="text-align: center; margin-top: 15px;">';
+            print '<button type="submit" class="button" style="background: #4caf50; color: white; border: none; padding: 12px 30px; cursor: pointer; font-size: 16px;">✉️ Envoyer l\'email via Dolibarr</button>';
+            print '</div>';
+            print '</form>';
+
+            print '<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">';
+            print '<button id="copyHtmlBtn" class="button" style="background: #ff9800; color: white; border: none; padding: 10px 20px; cursor: pointer;">📋 Copier le HTML (manuel)</button>';
+            print '<span style="margin-left: 10px; color: #666; font-size: 12px;">Pour envoi manuel via un autre client email</span>';
+            print '</div>';
+
             print '</div>';
             print '</div>';
 
@@ -376,17 +449,31 @@ if ($collaborator_id > 0) {
             var emailHtmlTemplate = <?php echo json_encode($email_html_template); ?>;
 
             document.getElementById("generateEmailBtn").addEventListener("click", function() {
+                // Afficher l'aperçu
                 document.getElementById("emailContent").innerHTML = emailHtmlTemplate;
-                document.getElementById("htmlCode").value = emailHtmlTemplate;
                 document.getElementById("emailPreview").style.display = "block";
-                document.getElementById("copyHtmlBtn").style.display = "inline-block";
+
+                // Remplir le champ caché pour l'envoi via formulaire
+                document.getElementById("email_body_hidden").value = emailHtmlTemplate;
             });
 
             document.getElementById("copyHtmlBtn").addEventListener("click", function() {
-                var htmlCode = document.getElementById("htmlCode");
-                htmlCode.select();
-                document.execCommand("copy");
-                alert("HTML copié dans le presse-papiers !");
+                // Créer un textarea temporaire pour copier le HTML
+                var tempTextarea = document.createElement("textarea");
+                tempTextarea.value = emailHtmlTemplate;
+                tempTextarea.style.position = "fixed";
+                tempTextarea.style.opacity = "0";
+                document.body.appendChild(tempTextarea);
+                tempTextarea.select();
+
+                try {
+                    document.execCommand("copy");
+                    alert("HTML copié dans le presse-papiers !");
+                } catch(err) {
+                    alert("Erreur lors de la copie : " + err);
+                }
+
+                document.body.removeChild(tempTextarea);
             });
             </script>
             <?php
