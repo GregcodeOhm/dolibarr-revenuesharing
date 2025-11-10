@@ -60,12 +60,12 @@ print '<td>';
 print '<select name="collaborator_id" class="flat minwidth200" required>';
 print '<option value="">-- Choisir un collaborateur --</option>';
 
-$sql = "SELECT rowid, name, firstname FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator WHERE status = 1 ORDER BY name, firstname";
+$sql = "SELECT rowid, label FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator WHERE active = 1 ORDER BY label";
 $resql = $db->query($sql);
 if ($resql) {
     while ($obj = $db->fetch_object($resql)) {
         $selected = ($collaborator_id == $obj->rowid) ? ' selected' : '';
-        print '<option value="'.$obj->rowid.'"'.$selected.'>'.dol_escape_htmltag($obj->name.' '.$obj->firstname).'</option>';
+        print '<option value="'.$obj->rowid.'"'.$selected.'>'.dol_escape_htmltag($obj->label).'</option>';
     }
 }
 print '</select>';
@@ -83,10 +83,12 @@ print '</form>';
 if ($collaborator_id > 0) {
 
     // Récupérer les infos du collaborateur
-    $sql_collab = "SELECT name, firstname, email FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator WHERE rowid = ".(int)$collaborator_id;
+    $sql_collab = "SELECT c.label, u.email FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator c";
+    $sql_collab .= " LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = c.fk_user";
+    $sql_collab .= " WHERE c.rowid = ".(int)$collaborator_id;
     $resql_collab = $db->query($sql_collab);
     $collaborator = $db->fetch_object($resql_collab);
-    $collaborator_fullname = $collaborator->name.' '.$collaborator->firstname;
+    $collaborator_fullname = $collaborator->label;
     $collaborator_email = $collaborator->email;
 
     print '<h3>Factures impayées pour '.$collaborator_fullname.' ('.date('Y').')</h3>';
