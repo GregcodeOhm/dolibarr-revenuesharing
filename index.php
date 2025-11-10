@@ -34,6 +34,15 @@ if (!$has_permission) {
 // Parameters
 $year = GETPOST('year', 'int') ? GETPOST('year', 'int') : date('Y');
 $filter_collaborator = GETPOST('filter_collaborator', 'int');
+$clear_cache = GETPOST('clear_cache', 'int');
+
+// Vider le cache si demandé
+if ($clear_cache) {
+    $cache->deletePattern('dashboard_stats_*');
+    setEventMessages('Cache vidé avec succès', null, 'mesgs');
+    header('Location: '.$_SERVER['PHP_SELF'].'?year='.$year.($filter_collaborator ? '&filter_collaborator='.$filter_collaborator : ''));
+    exit;
+}
 
 llxHeader('', 'Revenue Sharing', '');
 
@@ -134,6 +143,12 @@ for ($y = date('Y'); $y >= date('Y') - 5; $y--) {
 print '</select>';
 
 print '</form>';
+
+// Bouton pour vider le cache
+print ' <a href="'.$_SERVER["PHP_SELF"].'?year='.$year.'&clear_cache=1'.($filter_collaborator ? '&filter_collaborator='.$filter_collaborator : '').'" class="button" style="margin-left: 10px;" title="Vider le cache pour actualiser les statistiques immédiatement">';
+print '🔄 Actualiser les stats';
+print '</a>';
+
 print '</div>';
 
 // Boxes statistiques principales
