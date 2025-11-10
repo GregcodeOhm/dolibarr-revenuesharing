@@ -15,9 +15,9 @@ $action = GETPOST('action', 'alpha');
 $collaborator_id = GETPOST('collaborator_id', 'int');
 $transaction_type = GETPOST('transaction_type', 'alpha');
 $amount = GETPOST('amount', 'alpha');
-$description = GETPOST('description', 'text');
+$description = GETPOST('description', 'restricthtml');
 $transaction_date = GETPOST('transaction_date', 'alpha');
-$note_private = GETPOST('note_private', 'text');
+$note_private = GETPOST('note_private', 'restricthtml');
 $fk_facture_fourn = GETPOST('fk_facture_fourn', 'int');
 $load_supplier_amount = GETPOST('load_supplier_amount', 'alpha');
 
