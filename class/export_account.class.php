@@ -191,30 +191,18 @@ class ExportAccount
     }
     
     /**
-     * Export en PDF
+     * Calcule les statistiques de solde en fonction des filtres
+     * @return object Objet contenant filtered_credits, filtered_debits, filtered_balance, previous_balance, cumulative_balance, display_balance, display_credits, display_debits, display_count
      */
-    public function exportToPDF($filter_type = '', $filter_year = 0, $show_previsionnel = false)
+    private function calculateBalanceStatistics($filter_type = '', $filter_year = 0)
     {
-        global $conf, $langs;
-        
-        if (!$this->loadCollaboratorData($this->collaborator_id)) {
-            return false;
-        }
-        
-        if (!$this->loadTransactions($filter_type, $filter_year, $show_previsionnel)) {
-            return false;
-        }
-        
-        // Charger les données de chiffre d'affaires
-        $this->loadCAData($filter_year);
-        
-        // Calculer les statistiques avec solde cumulé si filtré par année
-        $filtered_credits = 0;
-        $filtered_debits = 0; 
-        $filtered_balance = 0;
-        $previous_balance = 0;
-        $filtered_count = count($this->transactions);
-        
+        $stats = new stdClass();
+        $stats->filtered_credits = 0;
+        $stats->filtered_debits = 0;
+        $stats->filtered_balance = 0;
+        $stats->previous_balance = 0;
+        $stats->filtered_count = count($this->transactions);
+
         // Si filtre par année, calculer le solde reporté (transactions + salaires)
         if ($filter_year > 0) {
             // Transactions classiques
@@ -227,7 +215,7 @@ class ExportAccount
 
             $resql_previous = $this->db->query($sql_previous);
             if ($resql_previous) {
-                $previous_balance = $this->db->fetch_object($resql_previous)->previous_balance;
+                $stats->previous_balance = $this->db->fetch_object($resql_previous)->previous_balance;
                 $this->db->free($resql_previous);
             }
 
@@ -240,23 +228,66 @@ class ExportAccount
             $resql_previous_salaries = $this->db->query($sql_previous_salaries);
             if ($resql_previous_salaries) {
                 $previous_salaries = $this->db->fetch_object($resql_previous_salaries)->previous_salaries;
-                $previous_balance -= $previous_salaries;
+                $stats->previous_balance -= $previous_salaries;
                 $this->db->free($resql_previous_salaries);
             }
         }
-        
+
         foreach ($this->transactions as $trans) {
             if ($trans->amount > 0) {
-                $filtered_credits += $trans->amount;
+                $stats->filtered_credits += $trans->amount;
             } else {
-                $filtered_debits += abs($trans->amount);
+                $stats->filtered_debits += abs($trans->amount);
             }
-            $filtered_balance += $trans->amount;
+            $stats->filtered_balance += $trans->amount;
+        }
+
+        // Solde cumulé = solde reporté + mouvements de l'année
+        $stats->cumulative_balance = $stats->previous_balance + $stats->filtered_balance;
+
+        // Utiliser les données filtrées si des filtres sont appliqués, sinon les globales
+        if ($filter_type || $filter_year) {
+            $stats->display_balance = $stats->cumulative_balance;
+            $stats->display_credits = $stats->filtered_credits;
+            $stats->display_debits = $stats->filtered_debits;
+            $stats->display_count = $stats->filtered_count;
+        } else {
+            // Si pas de filtre, afficher le solde global
+            $stats->display_balance = $this->balance_info ? $this->balance_info->current_balance : $stats->cumulative_balance;
+            $stats->display_credits = $this->balance_info ? $this->balance_info->total_credits : $stats->filtered_credits;
+            $stats->display_debits = $this->balance_info ? $this->balance_info->total_debits : $stats->filtered_debits;
+            $stats->display_count = $this->balance_info ? $this->balance_info->nb_transactions : $stats->filtered_count;
+        }
+
+        return $stats;
+    }
+
+    /**
+     * Export en PDF
+     * @param string $filter_type Type de transaction
+     * @param int $filter_year Année de filtrage
+     * @param bool $show_previsionnel Inclure les prévisionnels
+     * @param bool $return_content Si true, retourne le contenu au lieu de forcer le téléchargement
+     * @return string|void Contenu PDF si $return_content=true, sinon force le téléchargement
+     */
+    public function exportToPDF($filter_type = '', $filter_year = 0, $show_previsionnel = false, $return_content = false)
+    {
+        global $conf, $langs;
+        
+        if (!$this->loadCollaboratorData($this->collaborator_id)) {
+            return false;
         }
         
-        // Solde cumulé = solde reporté + mouvements de l'année
-        $cumulative_balance = $previous_balance + $filtered_balance;
-        
+        if (!$this->loadTransactions($filter_type, $filter_year, $show_previsionnel)) {
+            return false;
+        }
+
+        // Charger les données de chiffre d'affaires
+        $this->loadCAData($filter_year);
+
+        // Calculer les statistiques avec solde cumulé si filtré par année
+        $stats = $this->calculateBalanceStatistics($filter_type, $filter_year);
+
         // Utiliser la classe PDF de Dolibarr
         require_once DOL_DOCUMENT_ROOT.'/core/lib/pdf.lib.php';
         
@@ -344,48 +375,34 @@ class ExportAccount
         $pdf->Cell(0, 8, $resume_title, 0, 1);
         $pdf->SetFont('helvetica', '', 10);
 
-        // Utiliser les données filtrées si des filtres sont appliqués, sinon les globales
-        if ($filter_type || $filter_year) {
-            $display_balance = $cumulative_balance;
-            $display_credits = $filtered_credits;
-            $display_debits = $filtered_debits;
-            $display_count = $filtered_count;
-        } else {
-            // Si pas de filtre, afficher le solde global
-            $display_balance = $this->balance_info ? $this->balance_info->current_balance : $cumulative_balance;
-            $display_credits = $this->balance_info ? $this->balance_info->total_credits : $filtered_credits;
-            $display_debits = $this->balance_info ? $this->balance_info->total_debits : $filtered_debits;
-            $display_count = $this->balance_info ? $this->balance_info->nb_transactions : $filtered_count;
-        }
-
         // Si filtré par année, afficher le solde reporté d'abord
         if ($filter_year > 0) {
             $pdf->Cell(60, 6, 'Solde reporté:', 0, 0);
-            $pdf->Cell(0, 6, price($previous_balance).' €', 0, 1);
+            $pdf->Cell(0, 6, price($stats->previous_balance).' €', 0, 1);
         }
 
         // Afficher les mouvements de l'année ou totaux
         if ($filter_year > 0) {
             $pdf->Cell(60, 6, 'Crédits '.$filter_year.':', 0, 0);
-            $pdf->Cell(0, 6, price($display_credits).' €', 0, 1);
+            $pdf->Cell(0, 6, price($stats->display_credits).' €', 0, 1);
 
             $pdf->Cell(60, 6, 'Débits '.$filter_year.':', 0, 0);
-            $pdf->Cell(0, 6, price($display_debits).' €', 0, 1);
+            $pdf->Cell(0, 6, price($stats->display_debits).' €', 0, 1);
         } else {
             $pdf->Cell(60, 6, 'Total crédits:', 0, 0);
-            $pdf->Cell(0, 6, price($display_credits).' €', 0, 1);
+            $pdf->Cell(0, 6, price($stats->display_credits).' €', 0, 1);
 
             $pdf->Cell(60, 6, 'Total débits:', 0, 0);
-            $pdf->Cell(0, 6, price($display_debits).' €', 0, 1);
+            $pdf->Cell(0, 6, price($stats->display_debits).' €', 0, 1);
         }
 
         $pdf->Cell(60, 6, 'Nb transactions:', 0, 0);
-        $pdf->Cell(0, 6, $display_count, 0, 1);
+        $pdf->Cell(0, 6, $stats->display_count, 0, 1);
 
         // Solde cumulé en dernier, mis en évidence
         $pdf->Cell(60, 6, 'Solde cumulé:', 0, 0);
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(0, 6, price($display_balance).' €', 0, 1);
+        $pdf->Cell(0, 6, price($stats->display_balance).' €', 0, 1);
         $pdf->SetFont('helvetica', '', 10);
 
         // Indication sur l'inclusion/exclusion des prévisionnels dans le solde
@@ -495,10 +512,16 @@ class ExportAccount
         // Nom du fichier
         $filename = 'releve_compte_'.$this->collaborator_data->label.'_'.dol_print_date(dol_now(), 'dayrfc').'.pdf';
         $filename = dol_sanitizeFileName($filename);
-        
+
         // Output du PDF
-        $pdf->Output($filename, 'D');
-        exit(); // Arrêter l'exécution après l'envoi du PDF
+        if ($return_content) {
+            // Retourner le contenu pour envoi par email
+            return $pdf->Output('', 'S');
+        } else {
+            // Téléchargement direct
+            $pdf->Output($filename, 'D');
+            exit(); // Arrêter l'exécution après l'envoi du PDF
+        }
     }
     
     /**
@@ -816,214 +839,6 @@ class ExportAccount
     }
 
     /**
-     * Génère le contenu PDF et le retourne (pour envoi par email)
-     */
-    public function generatePDFContent($filter_type = '', $filter_year = 0, $show_previsionnel = false)
-    {
-        global $conf, $langs;
-
-        // Calculer les statistiques avec solde cumulé si filtré par année
-        $filtered_credits = 0;
-        $filtered_debits = 0;
-        $filtered_balance = 0;
-        $previous_balance = 0;
-        $filtered_count = count($this->transactions);
-
-        // Si filtre par année, calculer le solde reporté (transactions + salaires)
-        if ($filter_year > 0) {
-            // Transactions classiques
-            $sql_previous = "SELECT COALESCE(SUM(t.amount), 0) as previous_balance
-                FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
-                LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
-                LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
-                WHERE t.fk_collaborator = ".$this->collaborator_id." AND t.status = 1
-                AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) < ".$filter_year;
-
-            $resql_previous = $this->db->query($sql_previous);
-            if ($resql_previous) {
-                $previous_balance = $this->db->fetch_object($resql_previous)->previous_balance;
-                $this->db->free($resql_previous);
-            }
-
-            // Soustraire les salaires payés des années précédentes
-            $sql_previous_salaries = "SELECT COALESCE(SUM(solde_utilise), 0) as previous_salaries
-                FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration
-                WHERE fk_collaborator = ".$this->collaborator_id." AND status = 3
-                AND declaration_year < ".$filter_year;
-
-            $resql_previous_salaries = $this->db->query($sql_previous_salaries);
-            if ($resql_previous_salaries) {
-                $previous_salaries = $this->db->fetch_object($resql_previous_salaries)->previous_salaries;
-                $previous_balance -= $previous_salaries;
-                $this->db->free($resql_previous_salaries);
-            }
-        }
-
-        foreach ($this->transactions as $trans) {
-            if ($trans->amount > 0) {
-                $filtered_credits += $trans->amount;
-            } else {
-                $filtered_debits += abs($trans->amount);
-            }
-            $filtered_balance += $trans->amount;
-        }
-
-        // Solde cumulé = solde reporté + mouvements de l'année
-        $cumulative_balance = $previous_balance + $filtered_balance;
-
-        // Utiliser la classe PDF de Dolibarr
-        require_once DOL_DOCUMENT_ROOT.'/core/lib/pdf.lib.php';
-
-        // Créer le PDF avec TCPDF (inclus dans Dolibarr)
-        $pdf = pdf_getInstance();
-        $pdf->SetMargins(10, 10, 10);
-        $pdf->SetAutoPageBreak(true, 15);
-        $pdf->AddPage();
-
-        // En-tête avec logo
-        $this->addPDFHeader($pdf);
-
-        // Titre principal
-        $pdf->SetFont('helvetica', 'B', 16);
-        $pdf->Cell(0, 10, 'RELEVÉ DE COMPTE COLLABORATEUR', 0, 1, 'C');
-        $pdf->Ln(5);
-
-        // Infos collaborateur
-        $pdf->SetFont('helvetica', 'B', 12);
-        $pdf->Cell(0, 8, 'Collaborateur: '.$this->collaborator_data->label, 0, 1);
-
-        if ($this->collaborator_data->firstname && $this->collaborator_data->lastname) {
-            $pdf->SetFont('helvetica', '', 10);
-            $pdf->Cell(0, 6, 'Nom complet: '.$this->collaborator_data->firstname.' '.$this->collaborator_data->lastname, 0, 1);
-        }
-
-        if ($this->collaborator_data->email) {
-            $pdf->Cell(0, 6, 'Email: '.$this->collaborator_data->email, 0, 1);
-        }
-
-        $pdf->Cell(0, 6, 'Date: '.dol_print_date(dol_now(), 'daytext'), 0, 1);
-        $pdf->Ln(5);
-
-        // Section Chiffre d'Affaires & Répartition
-        if ($this->ca_info && $this->ca_info->ca_total_ht > 0) {
-            $pdf->SetFont('helvetica', 'B', 12);
-            $ca_title = 'CHIFFRE D\'AFFAIRES & RÉPARTITION';
-            if ($filter_year > 0) {
-                $ca_title .= ' ('.$filter_year.')';
-            }
-            $pdf->Cell(0, 8, $ca_title, 0, 1);
-            $pdf->SetFont('helvetica', '', 10);
-
-            // Chiffre d'affaires global
-            $pdf->Cell(60, 6, 'CA HT:', 0, 0);
-            $pdf->Cell(0, 6, price($this->ca_info->ca_total_ht).' €', 0, 1);
-
-            $pdf->Cell(60, 6, 'Nombre de factures:', 0, 0);
-            $pdf->Cell(0, 6, $this->ca_info->nb_factures_clients, 0, 1);
-
-            // Répartition des montants
-            if ($this->ca_info->collaborator_total_ht > 0 || $this->ca_info->studio_total_ht > 0) {
-                $pdf->Ln(3);
-                $pdf->SetFont('helvetica', 'B', 11);
-                $pdf->Cell(0, 6, 'Répartition des montants:', 0, 1);
-                $pdf->SetFont('helvetica', '', 10);
-
-                $pdf->Cell(60, 6, 'Part Collaborateur:', 0, 0);
-                $pdf->Cell(0, 6, price($this->ca_info->collaborator_total_ht).' €', 0, 1);
-
-                $pdf->Cell(60, 6, 'Part Structure:', 0, 0);
-                $pdf->Cell(0, 6, price($this->ca_info->studio_total_ht).' €', 0, 1);
-
-                if ($this->ca_info->avg_percentage > 0) {
-                    $pdf->Cell(60, 6, 'Pourcentage moyen:', 0, 0);
-                    $pdf->Cell(0, 6, number_format($this->ca_info->avg_percentage, 1).'%', 0, 1);
-                }
-            }
-
-            $pdf->Cell(60, 6, 'Nombre de contrats:', 0, 0);
-            $pdf->Cell(0, 6, $this->ca_info->nb_contrats, 0, 1);
-        }
-
-        $pdf->Ln(5);
-
-        // === RÉSUMÉ FINANCIER ===
-        $pdf->SetX(10);
-
-        $pdf->SetFont('helvetica', 'B', 12);
-        $resume_title = 'RÉSUMÉ FINANCIER';
-        if ($filter_type || $filter_year) {
-            $resume_title .= ' (FILTRÉ)';
-        }
-        $pdf->Cell(0, 8, $resume_title, 0, 1);
-        $pdf->SetFont('helvetica', '', 10);
-
-        // Utiliser les données filtrées si des filtres sont appliqués, sinon les globales
-        if ($filter_type || $filter_year) {
-            $display_balance = $cumulative_balance;
-            $display_credits = $filtered_credits;
-            $display_debits = $filtered_debits;
-            $display_count = $filtered_count;
-        } else {
-            // Si pas de filtre, afficher le solde global
-            $display_balance = $this->balance_info ? $this->balance_info->current_balance : $cumulative_balance;
-            $display_credits = $this->balance_info ? $this->balance_info->total_credits : $filtered_credits;
-            $display_debits = $this->balance_info ? $this->balance_info->total_debits : $filtered_debits;
-            $display_count = $this->balance_info ? $this->balance_info->nb_transactions : $filtered_count;
-        }
-
-        // Si filtré par année, afficher le solde reporté d'abord
-        if ($filter_year > 0) {
-            $pdf->Cell(60, 6, 'Solde reporté:', 0, 0);
-            $pdf->Cell(0, 6, price($previous_balance).' €', 0, 1);
-        }
-
-        // Afficher les mouvements de l'année ou totaux
-        if ($filter_year > 0) {
-            $pdf->Cell(60, 6, 'Crédits '.$filter_year.':', 0, 0);
-            $pdf->Cell(0, 6, price($display_credits).' €', 0, 1);
-
-            $pdf->Cell(60, 6, 'Débits '.$filter_year.':', 0, 0);
-            $pdf->Cell(0, 6, price($display_debits).' €', 0, 1);
-        } else {
-            $pdf->Cell(60, 6, 'Total crédits:', 0, 0);
-            $pdf->Cell(0, 6, price($display_credits).' €', 0, 1);
-
-            $pdf->Cell(60, 6, 'Total débits:', 0, 0);
-            $pdf->Cell(0, 6, price($display_debits).' €', 0, 1);
-        }
-
-        $pdf->Cell(60, 6, 'Nb transactions:', 0, 0);
-        $pdf->Cell(0, 6, $display_count, 0, 1);
-
-        // Solde cumulé en dernier, mis en évidence
-        $pdf->Cell(60, 6, 'Solde cumulé:', 0, 0);
-        $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(0, 6, price($display_balance).' €', 0, 1);
-        $pdf->SetFont('helvetica', '', 10);
-
-        // Indication sur l'inclusion/exclusion des prévisionnels dans le solde
-        if ($show_previsionnel) {
-            $pdf->SetFont('helvetica', 'I', 8);
-            $pdf->SetTextColor(0, 124, 186);
-            $pdf->Cell(0, 4, 'Inclut les contrats prévisionnels', 0, 1);
-        } else {
-            $pdf->SetFont('helvetica', 'I', 8);
-            $pdf->SetTextColor(102, 102, 102);
-            $pdf->Cell(0, 4, 'Contrats réels uniquement', 0, 1);
-        }
-        $pdf->SetTextColor(0, 0, 0);
-
-        // Pied de page
-        $pdf->Ln(10);
-        $pdf->SetFont('helvetica', '', 8);
-        $pdf->Cell(0, 6, 'Document généré le '.dol_print_date(dol_now(), 'dayhourtext'), 0, 1, 'C');
-        $pdf->Cell(0, 6, 'Module Revenue Sharing - Dolibarr', 0, 1, 'C');
-
-        // Retourner le contenu du PDF au lieu de le télécharger
-        return $pdf->Output('', 'S');
-    }
-
-    /**
      * Génère un relevé HTML pour envoi par email
      */
     public function generateHTMLContent($filter_type = '', $filter_year = 0, $show_previsionnel = false)
@@ -1031,65 +846,8 @@ class ExportAccount
         global $conf;
 
         // Calculer les statistiques
-        $filtered_credits = 0;
-        $filtered_debits = 0;
-        $filtered_balance = 0;
-        $previous_balance = 0;
-        $filtered_count = count($this->transactions);
-
-        // Si filtre par année, calculer le solde reporté
-        if ($filter_year > 0) {
-            $sql_previous = "SELECT COALESCE(SUM(t.amount), 0) as previous_balance
-                FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
-                LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
-                LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
-                WHERE t.fk_collaborator = ".$this->collaborator_id." AND t.status = 1
-                AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) < ".$filter_year;
-
-            $resql_previous = $this->db->query($sql_previous);
-            if ($resql_previous) {
-                $previous_balance = $this->db->fetch_object($resql_previous)->previous_balance;
-                $this->db->free($resql_previous);
-            }
-
-            $sql_previous_salaries = "SELECT COALESCE(SUM(solde_utilise), 0) as previous_salaries
-                FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration
-                WHERE fk_collaborator = ".$this->collaborator_id." AND status = 3
-                AND declaration_year < ".$filter_year;
-
-            $resql_previous_salaries = $this->db->query($sql_previous_salaries);
-            if ($resql_previous_salaries) {
-                $previous_salaries = $this->db->fetch_object($resql_previous_salaries)->previous_salaries;
-                $previous_balance -= $previous_salaries;
-                $this->db->free($resql_previous_salaries);
-            }
-        }
-
-        foreach ($this->transactions as $trans) {
-            if ($trans->amount > 0) {
-                $filtered_credits += $trans->amount;
-            } else {
-                $filtered_debits += abs($trans->amount);
-            }
-            $filtered_balance += $trans->amount;
-        }
-
-        $cumulative_balance = $previous_balance + $filtered_balance;
-
-        // Utiliser les données filtrées si des filtres sont appliqués, sinon les globales
-        if ($filter_type || $filter_year) {
-            $display_balance = $cumulative_balance;
-            $display_credits = $filtered_credits;
-            $display_debits = $filtered_debits;
-            $display_count = $filtered_count;
-        } else {
-            $display_balance = $this->balance_info ? $this->balance_info->current_balance : $cumulative_balance;
-            $display_credits = $this->balance_info ? $this->balance_info->total_credits : $filtered_credits;
-            $display_debits = $this->balance_info ? $this->balance_info->total_debits : $filtered_debits;
-            $display_count = $this->balance_info ? $this->balance_info->nb_transactions : $filtered_count;
-        }
-
-        $balance_color = $display_balance >= 0 ? '#28a745' : '#dc3545';
+        $stats = $this->calculateBalanceStatistics($filter_type, $filter_year);
+        $balance_color = $stats->display_balance >= 0 ? '#28a745' : '#dc3545';
 
         // Générer le HTML
         $html = '<!DOCTYPE html>
@@ -1251,27 +1009,27 @@ class ExportAccount
         if ($filter_year > 0) {
             $html .= '<div class="summary-card">
                 <h3>Solde reporté</h3>
-                <div class="value">'.price($previous_balance).' €</div>
+                <div class="value">'.price($stats->previous_balance).' €</div>
             </div>';
         }
 
         $html .= '<div class="summary-card green">
                 <h3>'.($filter_year > 0 ? 'Crédits '.$filter_year : 'Total crédits').'</h3>
-                <div class="value">'.price($display_credits).' €</div>
+                <div class="value">'.price($stats->display_credits).' €</div>
             </div>
             <div class="summary-card red">
                 <h3>'.($filter_year > 0 ? 'Débits '.$filter_year : 'Total débits').'</h3>
-                <div class="value">'.price($display_debits).' €</div>
+                <div class="value">'.price($stats->display_debits).' €</div>
             </div>
             <div class="summary-card">
                 <h3>Nb transactions</h3>
-                <div class="value">'.$display_count.'</div>
+                <div class="value">'.$stats->display_count.'</div>
             </div>
         </div>
 
         <div class="balance-highlight">
             <div>Solde '.($filter_year > 0 ? 'cumulé au '.$filter_year : 'actuel').'</div>
-            <div class="amount">'.price($display_balance).' €</div>
+            <div class="amount">'.price($stats->display_balance).' €</div>
         </div>
 
         <div class="footer">

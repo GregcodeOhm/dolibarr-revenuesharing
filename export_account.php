@@ -102,8 +102,8 @@ if ($action == 'send_email') {
             $filename = 'releve_compte_'.$export->collaborator_data->label.'_'.dol_now().'.pdf';
             $filepath = $tmp_dir.'/'.$filename;
 
-            // Générer le PDF
-            $pdf_content = $export->generatePDFContent($filter_type, $filter_year, $show_previsionnel);
+            // Générer le PDF en utilisant exportToPDF() avec return_content=true
+            $pdf_content = $export->exportToPDF($filter_type, $filter_year, $show_previsionnel, true);
             file_put_contents($filepath, $pdf_content);
 
             // Créer l'email avec pièce jointe
