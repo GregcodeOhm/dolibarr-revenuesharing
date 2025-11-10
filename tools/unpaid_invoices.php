@@ -94,6 +94,7 @@ if ($collaborator_id > 0) {
     print '<h3>Factures impayées pour '.$collaborator_fullname.' ('.date('Y').')</h3>';
 
     // Requête pour récupérer les factures impayées du collaborateur
+    // Note: le champ intervenant contient le label du collaborateur (string), pas son ID
     $sql = "SELECT
         f.rowid,
         f.ref,
@@ -111,7 +112,7 @@ if ($collaborator_id > 0) {
     LEFT JOIN ".MAIN_DB_PREFIX."facture_extrafields fe ON fe.fk_object = f.rowid
     LEFT JOIN ".MAIN_DB_PREFIX."societe s ON s.rowid = f.fk_soc
     WHERE YEAR(f.datef) = ".(int)$year."
-    AND fe.intervenant = ".(int)$collaborator_id."
+    AND fe.intervenant = '".$db->escape($collaborator_fullname)."'
     AND f.fk_statut = 1
     AND f.paye = 0
     ORDER BY f.date_lim_reglement ASC, f.datef DESC";
@@ -120,6 +121,37 @@ if ($collaborator_id > 0) {
 
     if ($resql) {
         $num = $db->num_rows($resql);
+
+        // Debug: afficher la requête et le nombre de résultats
+        if ($num == 0) {
+            print '<div style="background: #fff3cd; border: 1px solid #ffc107; padding: 15px; margin-bottom: 20px; border-radius: 5px;">';
+            print '<strong>Debug info:</strong><br>';
+            print 'Collaborateur recherché : <code>'.$collaborator_fullname.'</code><br>';
+            print 'Année : '.$year.'<br>';
+            print 'Requête SQL : <pre style="font-size: 11px; background: white; padding: 10px; overflow-x: auto;">'.htmlspecialchars($sql).'</pre>';
+
+            // Essayer sans le filtre intervenant pour voir combien de factures impayées il y a au total
+            $sql_test = "SELECT COUNT(*) as nb FROM ".MAIN_DB_PREFIX."facture f WHERE YEAR(f.datef) = ".(int)$year." AND f.fk_statut = 1 AND f.paye = 0";
+            $resql_test = $db->query($sql_test);
+            if ($resql_test) {
+                $obj_test = $db->fetch_object($resql_test);
+                print 'Total factures impayées (tous collaborateurs) : '.$obj_test->nb.'<br>';
+            }
+
+            // Vérifier si intervenant existe dans extrafields
+            $sql_test2 = "SELECT COUNT(*) as nb FROM ".MAIN_DB_PREFIX."facture f
+                LEFT JOIN ".MAIN_DB_PREFIX."facture_extrafields fe ON fe.fk_object = f.rowid
+                WHERE YEAR(f.datef) = ".(int)$year."
+                AND fe.intervenant = '".$db->escape($collaborator_fullname)."'
+                AND f.fk_statut = 1";
+            $resql_test2 = $db->query($sql_test2);
+            if ($resql_test2) {
+                $obj_test2 = $db->fetch_object($resql_test2);
+                print 'Factures validées pour ce collaborateur (payées ou non) : '.$obj_test2->nb.'<br>';
+            }
+
+            print '</div>';
+        }
 
         if ($num > 0) {
 
