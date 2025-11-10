@@ -33,46 +33,315 @@ $action = GETPOST('action', 'alpha');
 $year = GETPOST('year', 'int') ? GETPOST('year', 'int') : date('Y');
 
 // Action : envoyer l'email
+// Note: On ne passe pas le HTML via POST pour éviter la protection anti-injection
+// On le régénère côté serveur à partir des données de la facture
 if ($action == 'send_email' && $collaborator_id > 0) {
     $email_to = GETPOST('email_to', 'email');
     $email_subject = GETPOST('email_subject', 'restricthtml');
-    $email_body = GETPOST('email_body', 'none');  // 'none' pour ne pas filtrer le HTML
 
-    if (!empty($email_to) && !empty($email_body)) {
-        // Configuration de l'expéditeur
-        $from = $conf->global->MAIN_MAIL_EMAIL_FROM;
-        $from_name = $conf->global->MAIN_INFO_SOCIETE_NOM;
+    if (!empty($email_to)) {
+        // Régénérer le contenu HTML de l'email côté serveur
+        // (même logique que plus bas, mais on l'exécute avant l'affichage)
+        require_once DOL_DOCUMENT_ROOT.'/core/lib/functions.lib.php';
 
-        // Créer l'objet mail
-        $mail = new CMailFile(
-            $email_subject,
-            $email_to,
-            $from,
-            $email_body,
-            array(),  // attachments
-            array(),  // files_mime
-            array(),  // file_names
-            '',       // cc
-            '',       // bcc
-            0,        // deliveryreceipt
-            1,        // msgishtml (1 = HTML, 0 = text)
-            '',       // errors_to
-            '',       // css
-            '',       // trackid
-            '',       // moreinheader
-            'standard' // sendcontext
-        );
+        // Récupérer les infos du collaborateur
+        $sql_collab = "SELECT c.label, u.email FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator c";
+        $sql_collab .= " LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = c.fk_user";
+        $sql_collab .= " WHERE c.rowid = ".(int)$collaborator_id;
+        $resql_collab = $db->query($sql_collab);
+        $collaborator = $db->fetch_object($resql_collab);
+        $collaborator_fullname = $collaborator->label;
 
-        $result = $mail->sendfile();
+        // Requête pour récupérer les factures impayées
+        $sql_invoices = "SELECT
+            f.rowid,
+            f.ref,
+            f.datef,
+            f.date_lim_reglement,
+            f.total_ht,
+            f.total_tva,
+            f.total_ttc,
+            f.paye,
+            f.fk_statut,
+            s.nom as client_name,
+            s.rowid as client_id,
+            fe.intervenant,
+            (f.total_ttc - COALESCE((SELECT SUM(amount) FROM ".MAIN_DB_PREFIX."paiement_facture pf WHERE pf.fk_facture = f.rowid), 0)) as reste_a_payer
+        FROM ".MAIN_DB_PREFIX."facture f
+        LEFT JOIN ".MAIN_DB_PREFIX."facture_extrafields fe ON fe.fk_object = f.rowid
+        LEFT JOIN ".MAIN_DB_PREFIX."societe s ON s.rowid = f.fk_soc
+        WHERE YEAR(f.datef) = ".(int)$year."
+        AND fe.intervenant = '".$db->escape($collaborator_fullname)."'
+        AND f.fk_statut IN (1, 2)
+        AND f.paye = 0
+        HAVING reste_a_payer > 0
+        ORDER BY f.date_lim_reglement ASC, f.datef DESC";
 
-        if ($result) {
-            setEventMessages('Email envoyé avec succès à '.$email_to, null, 'mesgs');
+        $resql_invoices = $db->query($sql_invoices);
+
+        if ($resql_invoices) {
+            $num_invoices = $db->num_rows($resql_invoices);
+            $total_ttc = 0;
+            $total_reste = 0;
+            $invoices_data = array();
+
+            while ($obj = $db->fetch_object($resql_invoices)) {
+                $invoices_data[] = $obj;
+                $total_ttc += $obj->total_ttc;
+                $total_reste += $obj->reste_a_payer;
+            }
+
+            // Générer le HTML (fonction appelée plus loin)
+            $email_body = generateEmailHTML($collaborator_fullname, $num_invoices, $total_ttc, $total_reste, $invoices_data, $db, $year);
+
+            // Configuration de l'expéditeur
+            $from = $conf->global->MAIN_MAIL_EMAIL_FROM;
+            $from_name = $conf->global->MAIN_INFO_SOCIETE_NOM;
+
+            // Créer l'objet mail
+            $mail = new CMailFile(
+                $email_subject,
+                $email_to,
+                $from,
+                $email_body,
+                array(),  // attachments
+                array(),  // files_mime
+                array(),  // file_names
+                '',       // cc
+                '',       // bcc
+                0,        // deliveryreceipt
+                1,        // msgishtml (1 = HTML, 0 = text)
+                '',       // errors_to
+                '',       // css
+                '',       // trackid
+                '',       // moreinheader
+                'standard' // sendcontext
+            );
+
+            $result = $mail->sendfile();
+
+            if ($result) {
+                setEventMessages('Email envoyé avec succès à '.$email_to, null, 'mesgs');
+            } else {
+                setEventMessages('Erreur lors de l\'envoi de l\'email : '.$mail->error, null, 'errors');
+            }
         } else {
-            setEventMessages('Erreur lors de l\'envoi de l\'email : '.$mail->error, null, 'errors');
+            setEventMessages('Erreur lors de la récupération des factures', null, 'errors');
         }
     } else {
-        setEventMessages('Email ou contenu manquant (to: '.(!empty($email_to)?'ok':'vide').', body: '.(strlen($email_body)>0?strlen($email_body).' chars':'vide').')', null, 'errors');
+        setEventMessages('Email destinataire manquant', null, 'errors');
     }
+}
+
+// Fonction pour générer le HTML de l'email
+function generateEmailHTML($collaborator_fullname, $num, $total_ttc_unpaid, $total_reste_a_payer, $invoices, $db, $year) {
+    $email_html_rows = '';
+
+    foreach ($invoices as $invoice) {
+        $today = time();
+        $due_date = $db->jdate($invoice->date_lim_reglement);
+        $days_late = 0;
+        $row_bg = '';
+
+        if ($due_date) {
+            $days_late = floor(($today - $due_date) / 86400);
+            if ($days_late > 60) {
+                $row_bg = ' style="background: #ffebee;"';
+            } elseif ($days_late > 30) {
+                $row_bg = ' style="background: #fff3e0;"';
+            } elseif ($days_late > 0) {
+                $row_bg = ' style="background: #fff9c4;"';
+            }
+        }
+
+        $days_display = '-';
+        if ($days_late > 0) {
+            $days_display = '<strong style="color: #d32f2f;">'.$days_late.' jours</strong>';
+        }
+
+        $statut_email = '';
+        if ($invoice->reste_a_payer >= $invoice->total_ttc) {
+            $statut_email = 'Impayée';
+        } else {
+            $statut_email = 'Partiellement payée';
+        }
+
+        $email_html_rows .= '
+                <tr'.$row_bg.'>
+                    <td>'.dol_escape_htmltag($invoice->ref).'</td>
+                    <td>'.dol_escape_htmltag($invoice->client_name).'</td>
+                    <td>'.dol_print_date($db->jdate($invoice->datef), 'day').'</td>
+                    <td>'.($due_date ? dol_print_date($due_date, 'day') : '-').'</td>
+                    <td class="text-right">'.$days_display.'</td>
+                    <td class="text-right">'.price($invoice->total_ttc, 0, '', 1, -1, -1, 'EUR').'</td>
+                    <td class="text-right"><strong style="color: #d32f2f;">'.price($invoice->reste_a_payer, 0, '', 1, -1, -1, 'EUR').'</strong></td>
+                    <td class="text-center">'.$statut_email.'</td>
+                </tr>';
+    }
+
+    return '<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Factures impayées</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px 8px 0 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            background: #f8f9fa;
+            padding: 30px;
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+        }
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 20px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            min-width: 600px;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #dee2e6;
+            text-align: left;
+        }
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .total-row {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 30px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            padding: 20px;
+            color: #6c757d;
+            font-size: 12px;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+            .header {
+                padding: 20px 15px;
+            }
+            .header h1 {
+                font-size: 18px;
+            }
+            .content {
+                padding: 15px;
+            }
+            table {
+                font-size: 12px;
+                min-width: 500px;
+            }
+            th, td {
+                padding: 8px 4px;
+            }
+            .info-box {
+                padding: 10px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>État des factures impayées</h1>
+        </div>
+
+        <div class="content">
+            <p>Bonjour '.dol_escape_htmltag($collaborator_fullname).',</p>
+
+            <p>Voici un récapitulatif de vos factures en attente de paiement. Vous avez actuellement <strong>'.$num.' facture'.($num > 1 ? 's' : '').'</strong> pour un reste à payer de <strong>'.price($total_reste_a_payer, 0, '', 1, -1, -1, 'EUR').'</strong>.</p>
+
+            <h3 style="color: #667eea; margin-top: 30px;">Détail des factures :</h3>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Référence</th>
+                            <th>Client</th>
+                            <th>Date</th>
+                            <th>Échéance</th>
+                            <th class="text-right">Retard</th>
+                            <th class="text-right">Total TTC</th>
+                            <th class="text-right">Reste à payer</th>
+                            <th class="text-center">Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>'.$email_html_rows.'
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td colspan="5" class="text-right">TOTAL</td>
+                            <td class="text-right">'.price($total_ttc_unpaid, 0, '', 1, -1, -1, 'EUR').'</td>
+                            <td class="text-right" style="color: #d32f2f;">'.price($total_reste_a_payer, 0, '', 1, -1, -1, 'EUR').'</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="info-box">
+                <p style="margin: 0;"><strong>ℹ️ Information :</strong></p>
+                <p style="margin: 10px 0 0 0;">Ce document est fourni à titre informatif. Pour toute question concernant ces factures, n\'hésitez pas à nous contacter.</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Ce message a été généré automatiquement le '.dol_print_date(time(), 'dayhour').'</p>
+        </div>
+    </div>
+</body>
+</html>';
 }
 
 llxHeader('', 'Factures impayées par collaborateur');
@@ -317,7 +586,7 @@ if ($collaborator_id > 0) {
             print '<input type="hidden" name="action" value="send_email">';
             print '<input type="hidden" name="collaborator_id" value="'.$collaborator_id.'">';
             print '<input type="hidden" name="year" value="'.$year.'">';
-            print '<input type="hidden" name="email_body" id="email_body_hidden" value="">';
+            // Note: email_body n'est plus envoyé via POST, il est régénéré côté serveur
 
             print '<table class="border centpercent">';
             print '<tr>';
@@ -563,7 +832,7 @@ if ($collaborator_id > 0) {
                 document.getElementById("emailPreview").style.display = "block";
 
                 // Remplir le champ caché pour l'envoi via formulaire
-                document.getElementById("email_body_hidden").value = emailHtmlTemplate;
+                // Note: Le HTML n'est plus stocké dans un champ caché, il est régénéré côté serveur lors de l'envoi
             });
 
             document.getElementById("copyHtmlBtn").addEventListener("click", function() {
