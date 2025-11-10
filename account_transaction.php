@@ -144,6 +144,7 @@ if ($action == 'add' && $collaborator_id > 0 && $transaction_type && $amount != 
 // Formulaire d'ajout d'opération
 print '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">';
 print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'">';
+print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<input type="hidden" name="action" value="add">';
 
 // Sélection du collaborateur
