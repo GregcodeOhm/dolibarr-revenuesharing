@@ -376,14 +376,14 @@ if ($collaborator_id > 0) {
 
                 $email_html_rows .= '
                 <tr'.$row_bg.'>
-                    <td style="padding: 10px; border: 1px solid #dee2e6;">'.$invoice->ref.'</td>
-                    <td style="padding: 10px; border: 1px solid #dee2e6;">'.dol_escape_htmltag($invoice->client_name).'</td>
-                    <td style="padding: 10px; border: 1px solid #dee2e6;">'.dol_print_date($db->jdate($invoice->datef), 'day').'</td>
-                    <td style="padding: 10px; border: 1px solid #dee2e6;">'.($due_date ? dol_print_date($due_date, 'day') : '-').'</td>
-                    <td style="padding: 10px; text-align: right; border: 1px solid #dee2e6;">'.$days_display.'</td>
-                    <td style="padding: 10px; text-align: right; border: 1px solid #dee2e6;">'.price($invoice->total_ttc, 0, '', 1, -1, -1, 'EUR').'</td>
-                    <td style="padding: 10px; text-align: right; border: 1px solid #dee2e6;"><strong style="color: #d32f2f;">'.price($invoice->reste_a_payer, 0, '', 1, -1, -1, 'EUR').'</strong></td>
-                    <td style="padding: 10px; text-align: center; border: 1px solid #dee2e6;">'.$statut_email.'</td>
+                    <td>'.$invoice->ref.'</td>
+                    <td>'.dol_escape_htmltag($invoice->client_name).'</td>
+                    <td>'.dol_print_date($db->jdate($invoice->datef), 'day').'</td>
+                    <td>'.($due_date ? dol_print_date($due_date, 'day') : '-').'</td>
+                    <td class="text-right">'.$days_display.'</td>
+                    <td class="text-right">'.price($invoice->total_ttc, 0, '', 1, -1, -1, 'EUR').'</td>
+                    <td class="text-right"><strong style="color: #d32f2f;">'.price($invoice->reste_a_payer, 0, '', 1, -1, -1, 'EUR').'</strong></td>
+                    <td class="text-center">'.$statut_email.'</td>
                 </tr>';
             }
 
@@ -393,52 +393,161 @@ if ($collaborator_id > 0) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Factures impayées</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px 8px 0 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            background: #f8f9fa;
+            padding: 30px;
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+        }
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 20px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            min-width: 600px;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #dee2e6;
+            text-align: left;
+        }
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .total-row {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 30px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            padding: 20px;
+            color: #6c757d;
+            font-size: 12px;
+        }
+
+        /* Responsive pour mobile */
+        @media only screen and (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+            .header {
+                padding: 20px 15px;
+            }
+            .header h1 {
+                font-size: 18px;
+            }
+            .content {
+                padding: 15px;
+            }
+            table {
+                font-size: 12px;
+                min-width: 500px;
+            }
+            th, td {
+                padding: 8px 4px;
+            }
+            .info-box {
+                padding: 10px;
+                font-size: 14px;
+            }
+        }
+    </style>
 </head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px;">
-    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0;">
-        <h1 style="margin: 0; font-size: 24px;">État des factures impayées</h1>
-    </div>
-
-    <div style="background: #f8f9fa; padding: 30px; border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 8px 8px;">
-        <p>Bonjour '.dol_escape_htmltag($collaborator_fullname).',</p>
-
-        <p>Voici un récapitulatif de vos factures en attente de paiement. Vous avez actuellement <strong>'.$num.' facture'.($num > 1 ? 's' : '').'</strong> pour un reste à payer de <strong>'.price($total_reste_a_payer, 0, '', 1, -1, -1, 'EUR').'</strong>.</p>
-
-        <h3 style="color: #667eea; margin-top: 30px;">Détail des factures :</h3>
-
-        <table style="width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <thead>
-                <tr style="background: #667eea; color: white;">
-                    <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Référence</th>
-                    <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Client</th>
-                    <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Date</th>
-                    <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Échéance</th>
-                    <th style="padding: 12px; text-align: right; border: 1px solid #dee2e6;">Retard</th>
-                    <th style="padding: 12px; text-align: right; border: 1px solid #dee2e6;">Total TTC</th>
-                    <th style="padding: 12px; text-align: right; border: 1px solid #dee2e6;">Reste à payer</th>
-                    <th style="padding: 12px; text-align: center; border: 1px solid #dee2e6;">Statut</th>
-                </tr>
-            </thead>
-            <tbody>'.$email_html_rows.'
-            </tbody>
-            <tfoot>
-                <tr style="background: #f8f9fa; font-weight: bold;">
-                    <td colspan="5" style="padding: 12px; text-align: right; border: 1px solid #dee2e6;">TOTAL</td>
-                    <td style="padding: 12px; text-align: right; border: 1px solid #dee2e6;">'.price($total_ttc_unpaid, 0, '', 1, -1, -1, 'EUR').'</td>
-                    <td style="padding: 12px; text-align: right; border: 1px solid #dee2e6; color: #d32f2f;">'.price($total_reste_a_payer, 0, '', 1, -1, -1, 'EUR').'</td>
-                    <td></td>
-                </tr>
-            </tfoot>
-        </table>
-
-        <div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 5px; padding: 15px; margin-top: 30px;">
-            <p style="margin: 0;"><strong>ℹ️ Information :</strong></p>
-            <p style="margin: 10px 0 0 0;">Ce document est fourni à titre informatif. Pour toute question concernant ces factures, n\'hésitez pas à nous contacter.</p>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>État des factures impayées</h1>
         </div>
-    </div>
 
-    <div style="text-align: center; margin-top: 20px; padding: 20px; color: #6c757d; font-size: 12px;">
-        <p>Ce message a été généré automatiquement le '.dol_print_date(time(), 'dayhour').'</p>
+        <div class="content">
+            <p>Bonjour '.dol_escape_htmltag($collaborator_fullname).',</p>
+
+            <p>Voici un récapitulatif de vos factures en attente de paiement. Vous avez actuellement <strong>'.$num.' facture'.($num > 1 ? 's' : '').'</strong> pour un reste à payer de <strong>'.price($total_reste_a_payer, 0, '', 1, -1, -1, 'EUR').'</strong>.</p>
+
+            <h3 style="color: #667eea; margin-top: 30px;">Détail des factures :</h3>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Référence</th>
+                            <th>Client</th>
+                            <th>Date</th>
+                            <th>Échéance</th>
+                            <th class="text-right">Retard</th>
+                            <th class="text-right">Total TTC</th>
+                            <th class="text-right">Reste à payer</th>
+                            <th class="text-center">Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>'.$email_html_rows.'
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td colspan="5" class="text-right">TOTAL</td>
+                            <td class="text-right">'.price($total_ttc_unpaid, 0, '', 1, -1, -1, 'EUR').'</td>
+                            <td class="text-right" style="color: #d32f2f;">'.price($total_reste_a_payer, 0, '', 1, -1, -1, 'EUR').'</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="info-box">
+                <p style="margin: 0;"><strong>ℹ️ Information :</strong></p>
+                <p style="margin: 10px 0 0 0;">Ce document est fourni à titre informatif. Pour toute question concernant ces factures, n\'hésitez pas à nous contacter.</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Ce message a été généré automatiquement le '.dol_print_date(time(), 'dayhour').'</p>
+        </div>
     </div>
 </body>
 </html>';
