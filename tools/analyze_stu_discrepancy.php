@@ -472,7 +472,7 @@ if ($total_anomalies > 0) {
             print '<td>'.$fac->client_nom.'</td>';
             print '<td>'.($fac->intervenant ? $fac->intervenant : '<em>Non défini</em>').'</td>';
             print '<td class="right"><strong style="color: #d32f2f;">'.price($fac->total_ht, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
-            print '<td class="center"><a href="'.DOL_URL_ROOT.'/custom/revenuesharing/contract_card.php?action=create&facid='.$fac->rowid.'" class="button" target="_blank">Créer contrat</a></td>';
+            print '<td class="center"><a href="'.DOL_URL_ROOT.'/custom/revenuesharing/contract_card_complete.php?action=create&facid='.$fac->rowid.'" class="button" target="_blank">Créer contrat</a></td>';
             print '</tr>';
         }
 
@@ -525,13 +525,13 @@ if ($total_anomalies > 0) {
                 }
 
                 print '<tr class="oddeven '.$rowclass.'" style="font-size: 0.9em;">';
-                print '<td><a href="'.DOL_URL_ROOT.'/custom/revenuesharing/contract_card.php?id='.$contract->rowid.'" target="_blank">'.$contract->ref.'</a></td>';
+                print '<td><a href="'.DOL_URL_ROOT.'/custom/revenuesharing/contract_card_complete.php?id='.$contract->rowid.'" target="_blank">'.$contract->ref.'</a></td>';
                 print '<td>'.($contract->collaborator_name ? $contract->collaborator_name : 'N/A').'</td>';
                 print '<td class="right">'.price($contract->amount_ht, 0, '', 1, -1, -1, 'EUR').'</td>';
                 print '<td class="center">'.$statut_libelle.'</td>';
                 print '<td class="center">';
                 if ($contract->status == 0) {
-                    print '<a href="'.DOL_URL_ROOT.'/custom/revenuesharing/contract_card.php?id='.$contract->rowid.'&action=delete" class="button" style="background: #d32f2f; color: white;" target="_blank">Supprimer</a>';
+                    print '<a href="'.DOL_URL_ROOT.'/custom/revenuesharing/contract_card_complete.php?id='.$contract->rowid.'&action=delete" class="button" style="background: #d32f2f; color: white;" target="_blank">Supprimer</a>';
                 } else {
                     print '<em style="color: #666;">Validé</em>';
                 }
@@ -574,7 +574,7 @@ if ($total_anomalies > 0) {
             print '<td class="right"><strong style="color: '.($ecart > 0 ? '#f44336' : '#4CAF50').';">'.price($ecart, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
             print '<td class="center">';
             if (count($contracts_linked) == 1) {
-                print '<a href="'.DOL_URL_ROOT.'/custom/revenuesharing/contract_card.php?id='.$contracts_linked[0]->rowid.'&action=edit" class="button" target="_blank">Corriger</a>';
+                print '<a href="'.DOL_URL_ROOT.'/custom/revenuesharing/contract_card_complete.php?id='.$contracts_linked[0]->rowid.'&action=edit" class="button" target="_blank">Corriger</a>';
             } else {
                 print '<em>Multiples contrats</em>';
             }
