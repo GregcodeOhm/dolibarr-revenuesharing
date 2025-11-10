@@ -615,5 +615,210 @@ if ($total_anomalies > 0) {
     print '</div>';
 }
 
+// ====================================================================
+// PARTIE 6: DÉBOGAGE AVANCÉ - ANALYSE DÉTAILLÉE DES DIFFÉRENCES
+// ====================================================================
+print '<div class="analysis-section">';
+print '<h3>🔬 PARTIE 6: Débogage avancé - Analyse exhaustive</h3>';
+print '<p>Cette section affiche tous les détails pour identifier précisément l\'origine des différences.</p>';
+
+// Analyse 1: Contrats SANS facture liée ou avec facture hors STU
+print '<div style="background: #f3e5f5; border: 1px solid #9c27b0; border-radius: 5px; padding: 15px; margin: 15px 0;">';
+print '<h4 style="color: #4a148c;">🔍 Contrats sans facture STU liée (ou facture hors STU)</h4>';
+
+$sql_contracts_no_invoice = "SELECT
+    c.rowid,
+    c.ref,
+    c.fk_facture,
+    f.ref as facture_ref,
+    fe.analytique,
+    c.amount_ht,
+    c.status,
+    c.date_creation
+FROM ".MAIN_DB_PREFIX."revenuesharing_contract c
+LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = c.fk_facture
+LEFT JOIN ".MAIN_DB_PREFIX."facture_extrafields fe ON fe.fk_object = f.rowid
+WHERE YEAR(c.date_creation) = ".(int)$year."
+AND c.status >= 1
+AND (c.fk_facture IS NULL OR fe.analytique IS NULL OR fe.analytique != 'STU')
+ORDER BY c.date_creation DESC";
+
+$resql_no_invoice = $db->query($sql_contracts_no_invoice);
+$contracts_orphelins = array();
+$total_orphelins = 0;
+
+if ($resql_no_invoice) {
+    while ($obj = $db->fetch_object($resql_no_invoice)) {
+        $contracts_orphelins[] = $obj;
+        $total_orphelins += $obj->amount_ht;
+    }
+    $db->free($resql_no_invoice);
+}
+
+if (count($contracts_orphelins) > 0) {
+    print '<p><strong style="color: #c62828;">⚠️ '.count($contracts_orphelins).' contrat(s) validé(s) sans facture STU liée (total: '.price($total_orphelins, 0, '', 1, -1, -1, 'EUR').')</strong></p>';
+    print '<p>Ces contrats comptent dans le CA du module revenuesharing mais ne correspondent pas à des factures STU.</p>';
+
+    print '<table class="noborder centpercent">';
+    print '<tr class="liste_titre">';
+    print '<th>Réf Contrat</th>';
+    print '<th>Date création</th>';
+    print '<th>Facture liée</th>';
+    print '<th>Analytique facture</th>';
+    print '<th class="right">Montant HT</th>';
+    print '<th>Problème</th>';
+    print '</tr>';
+
+    foreach ($contracts_orphelins as $contract) {
+        $probleme = '';
+        if (empty($contract->fk_facture)) {
+            $probleme = '❌ Pas de facture liée';
+        } elseif (empty($contract->analytique)) {
+            $probleme = '⚠️ Facture sans analytique';
+        } elseif ($contract->analytique != 'STU') {
+            $probleme = '⚠️ Analytique = "'.$contract->analytique.'" (pas STU)';
+        }
+
+        print '<tr class="oddeven highlight-red">';
+        print '<td><a href="'.DOL_URL_ROOT.'/custom/revenuesharing/contract_card_complete.php?id='.$contract->rowid.'" target="_blank">'.$contract->ref.'</a></td>';
+        print '<td>'.dol_print_date($db->jdate($contract->date_creation), 'day').'</td>';
+        print '<td>'.($contract->facture_ref ? '<a href="'.DOL_URL_ROOT.'/compta/facture/card.php?facid='.$contract->fk_facture.'" target="_blank">'.$contract->facture_ref.'</a>' : '<em>N/A</em>').'</td>';
+        print '<td>'.($contract->analytique ? $contract->analytique : '<em>N/A</em>').'</td>';
+        print '<td class="right"><strong style="color: #d32f2f;">'.price($contract->amount_ht, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+        print '<td>'.$probleme.'</td>';
+        print '</tr>';
+    }
+
+    print '<tr class="liste_titre">';
+    print '<td colspan="4" class="right"><strong>TOTAL CONTRATS ORPHELINS:</strong></td>';
+    print '<td class="right"><strong style="font-size: 1.2em; color: #d32f2f;">'.price($total_orphelins, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+    print '<td></td>';
+    print '</tr>';
+    print '</table>';
+} else {
+    print '<p style="color: #2e7d32;">✅ Tous les contrats validés sont bien liés à des factures STU.</p>';
+}
+
+print '</div>';
+
+// Analyse 2: Récapitulatif final avec explication de l'écart
+print '<div style="background: #e1f5fe; border: 2px solid #0277bd; border-radius: 5px; padding: 20px; margin: 15px 0;">';
+print '<h4 style="color: #01579b;">📊 Récapitulatif et explication de l\'écart</h4>';
+
+$ca_factures = $total_ht_validated + $total_ht_paid;
+$ca_contracts = $total_contracts_validated;
+$ecart_total = $ca_contracts - $ca_factures;
+
+print '<table class="noborder centpercent" style="margin-bottom: 20px;">';
+print '<tr class="liste_titre"><th colspan="2">Sources de CA</th></tr>';
+
+print '<tr class="oddeven">';
+print '<td><strong>Factures STU validées + payées</strong></td>';
+print '<td class="right"><strong style="font-size: 1.2em; color: #1976d2;">'.price($ca_factures, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+print '</tr>';
+
+print '<tr class="oddeven">';
+print '<td><strong>Contrats revenuesharing validés</strong></td>';
+print '<td class="right"><strong style="font-size: 1.2em; color: #f57c00;">'.price($ca_contracts, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+print '</tr>';
+
+print '<tr class="liste_titre" style="background: '.($ecart_total >= 0 ? '#ffebee' : '#e8f5e9').'">';
+print '<td><strong>ÉCART TOTAL</strong></td>';
+print '<td class="right"><strong style="font-size: 1.4em; color: '.($ecart_total >= 0 ? '#d32f2f' : '#388e3c').';">'.price($ecart_total, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+print '</tr>';
+
+print '</table>';
+
+// Décomposition de l'écart
+print '<h5 style="color: #01579b;">Décomposition de l\'écart :</h5>';
+print '<table class="noborder centpercent">';
+
+if ($total_orphelins > 0) {
+    print '<tr class="oddeven highlight-red">';
+    print '<td>• Contrats orphelins (sans facture STU)</td>';
+    print '<td class="right"><strong style="color: #d32f2f;">+ '.price($total_orphelins, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+    print '</tr>';
+}
+
+$total_manquant_calc = 0;
+foreach ($factures_sans_contrat as $fac) {
+    $total_manquant_calc += $fac->total_ht;
+}
+
+if ($total_manquant_calc > 0) {
+    print '<tr class="oddeven highlight-red">';
+    print '<td>• Factures STU sans contrat</td>';
+    print '<td class="right"><strong style="color: #d32f2f;">- '.price($total_manquant_calc, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+    print '</tr>';
+}
+
+$ecart_doublons = 0;
+foreach ($factures_avec_contrat_multiple as $fac) {
+    $contracts_linked = $contract_by_invoice[$fac->ref];
+    $total_contracts_ht = 0;
+    foreach ($contracts_linked as $c) {
+        $total_contracts_ht += $c->amount_ht;
+    }
+    $ecart_doublons += ($total_contracts_ht - $fac->total_ht);
+}
+
+if ($ecart_doublons != 0) {
+    print '<tr class="oddeven highlight-orange">';
+    print '<td>• Doublons (contrats multiples pour même facture)</td>';
+    print '<td class="right"><strong style="color: #f57c00;">'.($ecart_doublons >= 0 ? '+' : '').price($ecart_doublons, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+    print '</tr>';
+}
+
+$ecart_montants = 0;
+foreach ($factures_avec_difference as $fac) {
+    $contracts_linked = $contract_by_invoice[$fac->ref];
+    $total_contracts_ht = 0;
+    foreach ($contracts_linked as $c) {
+        $total_contracts_ht += $c->amount_ht;
+    }
+    $ecart_montants += ($total_contracts_ht - $fac->total_ht);
+}
+
+if ($ecart_montants != 0) {
+    print '<tr class="oddeven highlight-orange">';
+    print '<td>• Différences de montants (contrat ≠ facture)</td>';
+    print '<td class="right"><strong style="color: #f57c00;">'.($ecart_montants >= 0 ? '+' : '').price($ecart_montants, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+    print '</tr>';
+}
+
+$ecart_calcule = $total_orphelins - $total_manquant_calc + $ecart_doublons + $ecart_montants;
+
+print '<tr class="liste_titre" style="background: #f5f5f5;">';
+print '<td><strong>Total écart expliqué</strong></td>';
+print '<td class="right"><strong style="font-size: 1.2em;">'.price($ecart_calcule, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+print '</tr>';
+
+$ecart_non_explique = $ecart_total - $ecart_calcule;
+
+if (abs($ecart_non_explique) > 0.01) {
+    print '<tr class="oddeven" style="background: #ffccbc;">';
+    print '<td><strong>⚠️ Écart NON expliqué</strong></td>';
+    print '<td class="right"><strong style="font-size: 1.2em; color: #bf360c;">'.price($ecart_non_explique, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+    print '</tr>';
+
+    print '<tr><td colspan="2" style="padding: 15px; background: #fff3e0;">';
+    print '<strong style="color: #e65100;">💡 Pistes d\'investigation supplémentaires:</strong><br>';
+    print '1. Vérifier les <strong>années de création</strong>: certains contrats ont-ils été créés une année différente de leur facture?<br>';
+    print '2. Vérifier les <strong>contrats supprimés</strong> manuellement de la base de données<br>';
+    print '3. Vérifier les <strong>modifications manuelles</strong> de montants dans les contrats<br>';
+    print '4. Vérifier s\'il existe des <strong>factures modifiées</strong> après création du contrat<br>';
+    print '5. Vérifier s\'il y a des <strong>contrats avec status particulier</strong> (status 2, 3, etc.)<br>';
+    print '</td></tr>';
+} else {
+    print '<tr class="oddeven" style="background: #c8e6c9;">';
+    print '<td colspan="2" class="center"><strong style="color: #2e7d32; font-size: 1.1em;">✅ Écart totalement expliqué! Tous les problèmes sont identifiés ci-dessus.</strong></td>';
+    print '</tr>';
+}
+
+print '</table>';
+print '</div>';
+
+print '</div>';
+
 llxFooter();
 $db->close();
