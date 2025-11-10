@@ -25,6 +25,7 @@ $show_previsionnel = GETPOST('show_previsionnel', 'int') ? true : false;
 $email_to = GETPOST('email_to', 'email');
 $email_subject = GETPOST('email_subject', 'restricthtml');
 $email_message = GETPOST('email_message', 'restricthtml');
+$email_format = GETPOST('email_format', 'alpha'); // 'pdf' ou 'html'
 
 if ($id <= 0) {
     setEventMessages('ID collaborateur manquant', null, 'errors');
@@ -39,7 +40,7 @@ if ($action == 'export' && !newToken('check')) {
     exit;
 }
 
-if ($action == 'send_email' && $format == 'pdf') {
+if ($action == 'send_email') {
 
     // Envoyer le relevé par email
     $export = new ExportAccount($db);
@@ -56,21 +57,6 @@ if ($action == 'send_email' && $format == 'pdf') {
 
         $export->loadCAData($filter_year);
 
-        // Générer le PDF dans un fichier temporaire
-        require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
-
-        $tmp_dir = $conf->revenuesharing->dir_temp;
-        if (!is_dir($tmp_dir)) {
-            dol_mkdir($tmp_dir);
-        }
-
-        $filename = 'releve_compte_'.$export->collaborator_data->label.'_'.dol_now().'.pdf';
-        $filepath = $tmp_dir.'/'.$filename;
-
-        // Générer le PDF
-        $pdf_content = $export->generatePDFContent($filter_type, $filter_year, $show_previsionnel);
-        file_put_contents($filepath, $pdf_content);
-
         // Préparer l'email
         $from = $conf->global->MAIN_MAIL_EMAIL_FROM;
         if (empty($from)) {
@@ -80,30 +66,73 @@ if ($action == 'send_email' && $format == 'pdf') {
         $sendcontext = 'standard';
         $trackid = 'revenuesharing'.$id;
 
-        // Créer l'email avec pièce jointe
-        $mail = new CMailFile(
-            $email_subject,
-            $email_to,
-            $from,
-            $email_message,
-            array($filepath),
-            array(),
-            array(),
-            '',
-            '',
-            0,
-            0,
-            '',
-            '',
-            $trackid,
-            '',
-            $sendcontext
-        );
+        if ($email_format == 'html') {
+            // Envoi en HTML (dans le corps du message)
+            $html_content = $export->generateHTMLContent($filter_type, $filter_year, $show_previsionnel);
+
+            // Créer l'email HTML
+            $mail = new CMailFile(
+                $email_subject,
+                $email_to,
+                $from,
+                $html_content,
+                array(),
+                array(),
+                array(),
+                '',
+                '',
+                0,
+                1, // msgishtml = 1 pour HTML
+                '',
+                '',
+                $trackid,
+                '',
+                $sendcontext
+            );
+
+        } else {
+            // Envoi en PDF (pièce jointe)
+            require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+
+            $tmp_dir = $conf->revenuesharing->dir_temp;
+            if (!is_dir($tmp_dir)) {
+                dol_mkdir($tmp_dir);
+            }
+
+            $filename = 'releve_compte_'.$export->collaborator_data->label.'_'.dol_now().'.pdf';
+            $filepath = $tmp_dir.'/'.$filename;
+
+            // Générer le PDF
+            $pdf_content = $export->generatePDFContent($filter_type, $filter_year, $show_previsionnel);
+            file_put_contents($filepath, $pdf_content);
+
+            // Créer l'email avec pièce jointe
+            $mail = new CMailFile(
+                $email_subject,
+                $email_to,
+                $from,
+                $email_message,
+                array($filepath),
+                array(),
+                array(),
+                '',
+                '',
+                0,
+                0,
+                '',
+                '',
+                $trackid,
+                '',
+                $sendcontext
+            );
+        }
 
         $result = $mail->sendfile();
 
-        // Supprimer le fichier temporaire
-        @unlink($filepath);
+        // Supprimer le fichier temporaire si PDF
+        if ($email_format == 'pdf' && isset($filepath)) {
+            @unlink($filepath);
+        }
 
         if ($result) {
             setEventMessages('Email envoyé avec succès à '.$email_to, null, 'mesgs');

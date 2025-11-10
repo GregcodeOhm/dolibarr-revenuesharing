@@ -345,10 +345,18 @@ class ExportAccount
         $pdf->SetFont('helvetica', '', 10);
 
         // Utiliser les données filtrées si des filtres sont appliqués, sinon les globales
-        $display_balance = ($filter_type || $filter_year) ? $cumulative_balance : $this->balance_info->current_balance;
-        $display_credits = ($filter_type || $filter_year) ? $filtered_credits : $this->balance_info->total_credits;
-        $display_debits = ($filter_type || $filter_year) ? $filtered_debits : $this->balance_info->total_debits;
-        $display_count = ($filter_type || $filter_year) ? $filtered_count : $this->balance_info->nb_transactions;
+        if ($filter_type || $filter_year) {
+            $display_balance = $cumulative_balance;
+            $display_credits = $filtered_credits;
+            $display_debits = $filtered_debits;
+            $display_count = $filtered_count;
+        } else {
+            // Si pas de filtre, afficher le solde global
+            $display_balance = $this->balance_info ? $this->balance_info->current_balance : $cumulative_balance;
+            $display_credits = $this->balance_info ? $this->balance_info->total_credits : $filtered_credits;
+            $display_debits = $this->balance_info ? $this->balance_info->total_debits : $filtered_debits;
+            $display_count = $this->balance_info ? $this->balance_info->nb_transactions : $filtered_count;
+        }
 
         // Si filtré par année, afficher le solde reporté d'abord
         if ($filter_year > 0) {
@@ -617,10 +625,18 @@ class ExportAccount
         fputcsv($output, array($resume_title), ';');
         
         // Utiliser les données filtrées si des filtres sont appliqués, sinon les globales
-        $display_balance = ($filter_type || $filter_year) ? $cumulative_balance : $this->balance_info->current_balance;
-        $display_credits = ($filter_type || $filter_year) ? $filtered_credits : $this->balance_info->total_credits;
-        $display_debits = ($filter_type || $filter_year) ? $filtered_debits : $this->balance_info->total_debits;
-        $display_count = ($filter_type || $filter_year) ? $filtered_count : $this->balance_info->nb_transactions;
+        if ($filter_type || $filter_year) {
+            $display_balance = $cumulative_balance;
+            $display_credits = $filtered_credits;
+            $display_debits = $filtered_debits;
+            $display_count = $filtered_count;
+        } else {
+            // Si pas de filtre, afficher le solde global
+            $display_balance = $this->balance_info ? $this->balance_info->current_balance : $cumulative_balance;
+            $display_credits = $this->balance_info ? $this->balance_info->total_credits : $filtered_credits;
+            $display_debits = $this->balance_info ? $this->balance_info->total_debits : $filtered_debits;
+            $display_count = $this->balance_info ? $this->balance_info->nb_transactions : $filtered_count;
+        }
         
         // Si filtré par année, afficher le solde reporté d'abord
         if ($filter_year > 0) {
@@ -942,10 +958,18 @@ class ExportAccount
         $pdf->SetFont('helvetica', '', 10);
 
         // Utiliser les données filtrées si des filtres sont appliqués, sinon les globales
-        $display_balance = ($filter_type || $filter_year) ? $cumulative_balance : $this->balance_info->current_balance;
-        $display_credits = ($filter_type || $filter_year) ? $filtered_credits : $this->balance_info->total_credits;
-        $display_debits = ($filter_type || $filter_year) ? $filtered_debits : $this->balance_info->total_debits;
-        $display_count = ($filter_type || $filter_year) ? $filtered_count : $this->balance_info->nb_transactions;
+        if ($filter_type || $filter_year) {
+            $display_balance = $cumulative_balance;
+            $display_credits = $filtered_credits;
+            $display_debits = $filtered_debits;
+            $display_count = $filtered_count;
+        } else {
+            // Si pas de filtre, afficher le solde global
+            $display_balance = $this->balance_info ? $this->balance_info->current_balance : $cumulative_balance;
+            $display_credits = $this->balance_info ? $this->balance_info->total_credits : $filtered_credits;
+            $display_debits = $this->balance_info ? $this->balance_info->total_debits : $filtered_debits;
+            $display_count = $this->balance_info ? $this->balance_info->nb_transactions : $filtered_count;
+        }
 
         // Si filtré par année, afficher le solde reporté d'abord
         if ($filter_year > 0) {
@@ -997,6 +1021,268 @@ class ExportAccount
 
         // Retourner le contenu du PDF au lieu de le télécharger
         return $pdf->Output('', 'S');
+    }
+
+    /**
+     * Génère un relevé HTML pour envoi par email
+     */
+    public function generateHTMLContent($filter_type = '', $filter_year = 0, $show_previsionnel = false)
+    {
+        global $conf;
+
+        // Calculer les statistiques
+        $filtered_credits = 0;
+        $filtered_debits = 0;
+        $filtered_balance = 0;
+        $previous_balance = 0;
+        $filtered_count = count($this->transactions);
+
+        // Si filtre par année, calculer le solde reporté
+        if ($filter_year > 0) {
+            $sql_previous = "SELECT COALESCE(SUM(t.amount), 0) as previous_balance
+                FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+                LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
+                LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
+                WHERE t.fk_collaborator = ".$this->collaborator_id." AND t.status = 1
+                AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) < ".$filter_year;
+
+            $resql_previous = $this->db->query($sql_previous);
+            if ($resql_previous) {
+                $previous_balance = $this->db->fetch_object($resql_previous)->previous_balance;
+                $this->db->free($resql_previous);
+            }
+
+            $sql_previous_salaries = "SELECT COALESCE(SUM(solde_utilise), 0) as previous_salaries
+                FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration
+                WHERE fk_collaborator = ".$this->collaborator_id." AND status = 3
+                AND declaration_year < ".$filter_year;
+
+            $resql_previous_salaries = $this->db->query($sql_previous_salaries);
+            if ($resql_previous_salaries) {
+                $previous_salaries = $this->db->fetch_object($resql_previous_salaries)->previous_salaries;
+                $previous_balance -= $previous_salaries;
+                $this->db->free($resql_previous_salaries);
+            }
+        }
+
+        foreach ($this->transactions as $trans) {
+            if ($trans->amount > 0) {
+                $filtered_credits += $trans->amount;
+            } else {
+                $filtered_debits += abs($trans->amount);
+            }
+            $filtered_balance += $trans->amount;
+        }
+
+        $cumulative_balance = $previous_balance + $filtered_balance;
+
+        // Utiliser les données filtrées si des filtres sont appliqués, sinon les globales
+        if ($filter_type || $filter_year) {
+            $display_balance = $cumulative_balance;
+            $display_credits = $filtered_credits;
+            $display_debits = $filtered_debits;
+            $display_count = $filtered_count;
+        } else {
+            $display_balance = $this->balance_info ? $this->balance_info->current_balance : $cumulative_balance;
+            $display_credits = $this->balance_info ? $this->balance_info->total_credits : $filtered_credits;
+            $display_debits = $this->balance_info ? $this->balance_info->total_debits : $filtered_debits;
+            $display_count = $this->balance_info ? $this->balance_info->nb_transactions : $filtered_count;
+        }
+
+        $balance_color = $display_balance >= 0 ? '#28a745' : '#dc3545';
+
+        // Générer le HTML
+        $html = '<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relevé de compte - '.$this->collaborator_data->label.'</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #007cba;
+            border-bottom: 3px solid #007cba;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #667eea;
+            margin-top: 30px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 8px;
+        }
+        .info-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .info-section p {
+            margin: 5px 0;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .summary-card {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #007cba;
+        }
+        .summary-card.green {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+        .summary-card.red {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        .summary-card.yellow {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+        }
+        .summary-card h3 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: #666;
+        }
+        .summary-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        .balance-highlight {
+            background: '.$balance_color.';
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .balance-highlight .amount {
+            font-size: 36px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Relevé de Compte Collaborateur</h1>
+
+        <div class="info-section">
+            <p><strong>Collaborateur :</strong> '.$this->collaborator_data->label.'</p>';
+
+        if ($this->collaborator_data->firstname && $this->collaborator_data->lastname) {
+            $html .= '<p><strong>Nom complet :</strong> '.$this->collaborator_data->firstname.' '.$this->collaborator_data->lastname.'</p>';
+        }
+        if ($this->collaborator_data->email) {
+            $html .= '<p><strong>Email :</strong> '.$this->collaborator_data->email.'</p>';
+        }
+
+        $html .= '<p><strong>Date :</strong> '.dol_print_date(dol_now(), 'daytext').'</p>';
+        if ($filter_year > 0) {
+            $html .= '<p><strong>Période :</strong> Année '.$filter_year.'</p>';
+        }
+        if ($show_previsionnel) {
+            $html .= '<p style="color: #007cba;"><em>Inclut les contrats prévisionnels</em></p>';
+        } else {
+            $html .= '<p style="color: #666;"><em>Contrats réels uniquement</em></p>';
+        }
+
+        $html .= '</div>';
+
+        // Section CA si disponible
+        if ($this->ca_info && $this->ca_info->ca_total_ht > 0) {
+            $html .= '<h2>Chiffre d\'Affaires & Répartition'.($filter_year > 0 ? ' ('.$filter_year.')' : '').'</h2>
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <h3>CA HT</h3>
+                    <div class="value">'.price($this->ca_info->ca_total_ht).' €</div>
+                    <small>'.$this->ca_info->nb_factures_clients.' facture(s)</small>
+                </div>';
+
+            if ($this->ca_info->collaborator_total_ht > 0) {
+                $html .= '<div class="summary-card green">
+                    <h3>Part Collaborateur</h3>
+                    <div class="value">'.price($this->ca_info->collaborator_total_ht).' €</div>
+                </div>';
+            }
+
+            if ($this->ca_info->studio_total_ht > 0) {
+                $html .= '<div class="summary-card yellow">
+                    <h3>Part Structure</h3>
+                    <div class="value">'.price($this->ca_info->studio_total_ht).' €</div>
+                </div>';
+            }
+
+            $html .= '</div>';
+        }
+
+        // Résumé financier
+        $html .= '<h2>Résumé Financier'.($filter_type || $filter_year ? ' (Filtré)' : '').'</h2>
+        <div class="summary-grid">';
+
+        if ($filter_year > 0) {
+            $html .= '<div class="summary-card">
+                <h3>Solde reporté</h3>
+                <div class="value">'.price($previous_balance).' €</div>
+            </div>';
+        }
+
+        $html .= '<div class="summary-card green">
+                <h3>'.($filter_year > 0 ? 'Crédits '.$filter_year : 'Total crédits').'</h3>
+                <div class="value">'.price($display_credits).' €</div>
+            </div>
+            <div class="summary-card red">
+                <h3>'.($filter_year > 0 ? 'Débits '.$filter_year : 'Total débits').'</h3>
+                <div class="value">'.price($display_debits).' €</div>
+            </div>
+            <div class="summary-card">
+                <h3>Nb transactions</h3>
+                <div class="value">'.$display_count.'</div>
+            </div>
+        </div>
+
+        <div class="balance-highlight">
+            <div>Solde '.($filter_year > 0 ? 'cumulé au '.$filter_year : 'actuel').'</div>
+            <div class="amount">'.price($display_balance).' €</div>
+        </div>
+
+        <div class="footer">
+            <p>Document généré le '.dol_print_date(dol_now(), 'dayhourtext').'</p>
+            <p>Module Revenue Sharing - '.$conf->global->MAIN_INFO_SOCIETE_NOM.'</p>
+        </div>
+    </div>
+</body>
+</html>';
+
+        return $html;
     }
 }
 ?>

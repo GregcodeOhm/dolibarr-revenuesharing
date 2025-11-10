@@ -855,6 +855,20 @@ document.addEventListener('DOMContentLoaded', function() {
             <input type="hidden" name="show_previsionnel" value="<?php echo $show_previsionnel ? '1' : '0'; ?>">
 
             <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Format du relevé:</label>
+                <div style="display: flex; gap: 20px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="radio" name="email_format" value="pdf" checked style="margin-right: 5px;">
+                        <span>PDF (pièce jointe)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="radio" name="email_format" value="html" style="margin-right: 5px;">
+                        <span>HTML (dans le corps du message)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 15px;">
                 <label style="display: block; font-weight: bold; margin-bottom: 5px;">Adresse email du destinataire:</label>
                 <input type="email" name="email_to" id="email_to" value="<?php echo dol_escape_htmltag($collaborator->email); ?>" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" required>
             </div>
