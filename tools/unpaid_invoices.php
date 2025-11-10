@@ -36,7 +36,7 @@ $year = GETPOST('year', 'int') ? GETPOST('year', 'int') : date('Y');
 if ($action == 'send_email' && $collaborator_id > 0) {
     $email_to = GETPOST('email_to', 'email');
     $email_subject = GETPOST('email_subject', 'restricthtml');
-    $email_body = GETPOST('email_body', 'restricthtml');
+    $email_body = GETPOST('email_body', 'none');  // 'none' pour ne pas filtrer le HTML
 
     if (!empty($email_to) && !empty($email_body)) {
         // Configuration de l'expéditeur
@@ -55,12 +55,12 @@ if ($action == 'send_email' && $collaborator_id > 0) {
             '',       // cc
             '',       // bcc
             0,        // deliveryreceipt
-            -1,       // msgishtml (1 = HTML, 0 = text)
+            1,        // msgishtml (1 = HTML, 0 = text)
             '',       // errors_to
             '',       // css
             '',       // trackid
             '',       // moreinheader
-            'html'    // sendcontext
+            'standard' // sendcontext
         );
 
         $result = $mail->sendfile();
@@ -71,7 +71,7 @@ if ($action == 'send_email' && $collaborator_id > 0) {
             setEventMessages('Erreur lors de l\'envoi de l\'email : '.$mail->error, null, 'errors');
         }
     } else {
-        setEventMessages('Email ou contenu manquant', null, 'errors');
+        setEventMessages('Email ou contenu manquant (to: '.(!empty($email_to)?'ok':'vide').', body: '.(strlen($email_body)>0?strlen($email_body).' chars':'vide').')', null, 'errors');
     }
 }
 
