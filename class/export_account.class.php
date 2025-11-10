@@ -1059,5 +1059,321 @@ class ExportAccount
 
         return $html;
     }
+
+    /**
+     * Génère un relevé HTML avec mise en page type PDF pour envoi par email
+     */
+    public function generateHTMLPDFStyle($filter_type = '', $filter_year = 0, $show_previsionnel = false)
+    {
+        global $conf, $mysoc;
+
+        // Calculer les statistiques
+        $stats = $this->calculateBalanceStatistics($filter_type, $filter_year);
+
+        // Générer le HTML avec style simple type document/PDF
+        $html = '<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relevé de compte - '.$this->collaborator_data->label.'</title>
+    <style>
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 10pt;
+            color: #000;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #fff;
+        }
+        .header {
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 16pt;
+            font-weight: bold;
+        }
+        .info-section {
+            margin: 15px 0;
+            line-height: 1.6;
+        }
+        .info-section p {
+            margin: 3px 0;
+        }
+        .section-title {
+            font-size: 12pt;
+            font-weight: bold;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        .summary-table {
+            width: 100%;
+            margin: 10px 0;
+        }
+        .summary-table td {
+            padding: 3px 0;
+        }
+        .summary-table td:first-child {
+            width: 200px;
+        }
+        .summary-table td.value {
+            font-weight: normal;
+        }
+        .summary-table td.bold {
+            font-weight: bold;
+        }
+        .note {
+            font-style: italic;
+            font-size: 8pt;
+            color: #666;
+        }
+        .note.blue {
+            color: #007cba;
+        }
+        table.transactions {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 8pt;
+        }
+        table.transactions th {
+            background: #f0f0f0;
+            border: 1px solid #000;
+            padding: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        table.transactions td {
+            border: 1px solid #000;
+            padding: 5px;
+        }
+        table.transactions td.center {
+            text-align: center;
+        }
+        table.transactions td.right {
+            text-align: right;
+        }
+        .month-separator {
+            background: #f0f0f0;
+            border: 1px solid #000;
+            padding: 5px;
+            font-weight: bold;
+            font-size: 9pt;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #ccc;
+            text-align: center;
+            font-size: 8pt;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>RELEVÉ DE COMPTE COLLABORATEUR</h1>
+    </div>
+
+    <div class="info-section">
+        <p><strong>Collaborateur :</strong> '.$this->collaborator_data->label.'</p>';
+
+        if ($this->collaborator_data->firstname && $this->collaborator_data->lastname) {
+            $html .= '<p><strong>Nom complet :</strong> '.$this->collaborator_data->firstname.' '.$this->collaborator_data->lastname.'</p>';
+        }
+        if ($this->collaborator_data->email) {
+            $html .= '<p><strong>Email :</strong> '.$this->collaborator_data->email.'</p>';
+        }
+
+        $html .= '<p><strong>Date d\'édition :</strong> '.dol_print_date(dol_now(), 'daytext').'</p>';
+        if ($filter_year > 0) {
+            $html .= '<p><strong>Période :</strong> Année '.$filter_year.'</p>';
+        }
+
+        $html .= '</div>';
+
+        // Section CA si disponible
+        if ($this->ca_info && $this->ca_info->ca_total_ht > 0) {
+            $html .= '<div class="section-title">CHIFFRE D\'AFFAIRES & RÉPARTITION'.($filter_year > 0 ? ' ('.$filter_year.')' : '').'</div>
+            <table class="summary-table">
+                <tr>
+                    <td>Chiffre d\'affaires total HT:</td>
+                    <td class="value">'.price($this->ca_info->ca_total_ht).' €</td>
+                </tr>
+                <tr>
+                    <td>Nombre de factures clients:</td>
+                    <td class="value">'.$this->ca_info->nb_factures_clients.'</td>
+                </tr>';
+
+            if ($this->ca_info->collaborator_total_ht > 0) {
+                $html .= '<tr>
+                    <td>Part collaborateur:</td>
+                    <td class="value">'.price($this->ca_info->collaborator_total_ht).' €</td>
+                </tr>';
+            }
+
+            if ($this->ca_info->studio_total_ht > 0) {
+                $html .= '<tr>
+                    <td>Part structure:</td>
+                    <td class="value">'.price($this->ca_info->studio_total_ht).' €</td>
+                </tr>';
+            }
+
+            if ($this->ca_info->avg_percentage > 0) {
+                $html .= '<tr>
+                    <td>Pourcentage moyen:</td>
+                    <td class="value">'.number_format($this->ca_info->avg_percentage, 1).'%</td>
+                </tr>';
+            }
+
+            $html .= '<tr>
+                    <td>Nombre de contrats:</td>
+                    <td class="value">'.$this->ca_info->nb_contrats.'</td>
+                </tr>
+            </table>';
+        }
+
+        // Résumé financier
+        $resume_title = 'RÉSUMÉ FINANCIER';
+        if ($filter_type || $filter_year) {
+            $resume_title .= ' (FILTRÉ)';
+        }
+
+        $html .= '<div class="section-title">'.$resume_title.'</div>
+        <table class="summary-table">';
+
+        // Si filtré par année, afficher le solde reporté d'abord
+        if ($filter_year > 0) {
+            $html .= '<tr>
+                <td>Solde reporté:</td>
+                <td class="value">'.price($stats->previous_balance).' €</td>
+            </tr>';
+        }
+
+        // Afficher les mouvements de l'année ou totaux
+        if ($filter_year > 0) {
+            $html .= '<tr>
+                <td>Crédits '.$filter_year.':</td>
+                <td class="value">'.price($stats->display_credits).' €</td>
+            </tr>
+            <tr>
+                <td>Débits '.$filter_year.':</td>
+                <td class="value">'.price($stats->display_debits).' €</td>
+            </tr>';
+        } else {
+            $html .= '<tr>
+                <td>Total crédits:</td>
+                <td class="value">'.price($stats->display_credits).' €</td>
+            </tr>
+            <tr>
+                <td>Total débits:</td>
+                <td class="value">'.price($stats->display_debits).' €</td>
+            </tr>';
+        }
+
+        $html .= '<tr>
+                <td>Nb transactions:</td>
+                <td class="value">'.$stats->display_count.'</td>
+            </tr>
+            <tr>
+                <td>Solde cumulé:</td>
+                <td class="bold">'.price($stats->display_balance).' €</td>
+            </tr>
+        </table>';
+
+        // Indication sur l'inclusion/exclusion des prévisionnels
+        if ($show_previsionnel) {
+            $html .= '<p class="note blue">Inclut les contrats prévisionnels</p>';
+        } else {
+            $html .= '<p class="note">Contrats réels uniquement</p>';
+        }
+
+        // Historique des transactions
+        if (!empty($this->transactions)) {
+            $html .= '<div class="section-title">HISTORIQUE DES TRANSACTIONS</div>
+            <table class="transactions">
+                <thead>
+                    <tr>
+                        <th style="width: 80px;">Date</th>
+                        <th style="width: 100px;">Type</th>
+                        <th>Description</th>
+                        <th style="width: 80px;">Montant</th>
+                        <th style="width: 100px;">Référence</th>
+                    </tr>
+                </thead>
+                <tbody>';
+
+            $type_labels = array(
+                'contract' => 'Contrats',
+                'commission' => 'Commissions',
+                'bonus' => 'Bonus',
+                'interest' => 'Intéressements',
+                'advance' => 'Avances',
+                'fee' => 'Frais',
+                'refund' => 'Remboursements',
+                'adjustment' => 'Ajustements',
+                'salary' => 'Salaires',
+                'other_credit' => 'Autres crédits',
+                'other_debit' => 'Autres débits'
+            );
+
+            $month_names = array(
+                1 => 'Janvier', 2 => 'Février', 3 => 'Mars', 4 => 'Avril',
+                5 => 'Mai', 6 => 'Juin', 7 => 'Juillet', 8 => 'Août',
+                9 => 'Septembre', 10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre'
+            );
+
+            $previous_month = null;
+
+            foreach ($this->transactions as $trans) {
+                // Détecter le changement de mois
+                $trans_date = $this->db->jdate($trans->display_date);
+                $current_month = date('Y-m', $trans_date);
+                $current_month_name = $month_names[(int)date('n', $trans_date)] . ' ' . date('Y', $trans_date);
+
+                // Afficher le séparateur de mois
+                if ($previous_month === null || $previous_month !== $current_month) {
+                    $html .= '<tr><td colspan="5" class="month-separator">'.$current_month_name.'</td></tr>';
+                }
+                $previous_month = $current_month;
+
+                $html .= '<tr>
+                    <td class="center">'.dol_print_date($trans_date, 'day').'</td>
+                    <td>'.($type_labels[$trans->transaction_type] ?? $trans->transaction_type).'</td>';
+
+                // Limiter la description
+                $description = strlen($trans->description) > 40 ? substr($trans->description, 0, 37).'...' : $trans->description;
+                $html .= '<td>'.htmlspecialchars($description).'</td>';
+
+                $html .= '<td class="right">'.price($trans->amount).'</td>';
+
+                $reference = '';
+                if ($trans->contract_ref) $reference = $trans->contract_ref;
+                elseif ($trans->facture_ref) $reference = $trans->facture_ref;
+                elseif ($trans->facture_fourn_ref) $reference = $trans->facture_fourn_ref;
+
+                $html .= '<td class="center">'.$reference.'</td>
+                </tr>';
+            }
+
+            $html .= '</tbody>
+            </table>';
+        }
+
+        // Footer
+        $html .= '<div class="footer">
+            <p>Document généré le '.dol_print_date(dol_now(), 'dayhourtext').'</p>
+            <p>Module Revenue Sharing - '.$conf->global->MAIN_INFO_SOCIETE_NOM.'</p>
+        </div>
+    </div>
+</body>
+</html>';
+
+        return $html;
+    }
 }
 ?>

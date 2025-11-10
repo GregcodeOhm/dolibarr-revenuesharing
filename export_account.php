@@ -25,7 +25,7 @@ $show_previsionnel = GETPOST('show_previsionnel', 'int') ? true : false;
 $email_to = GETPOST('email_to', 'email');
 $email_subject = GETPOST('email_subject', 'restricthtml');
 $email_message = GETPOST('email_message', 'restricthtml');
-$email_format = GETPOST('email_format', 'alpha'); // 'pdf' ou 'html'
+$email_format = GETPOST('email_format', 'alpha'); // 'pdf', 'html' ou 'both'
 
 if ($id <= 0) {
     setEventMessages('ID collaborateur manquant', null, 'errors');
@@ -67,7 +67,7 @@ if ($action == 'send_email') {
         $trackid = 'revenuesharing'.$id;
 
         if ($email_format == 'html') {
-            // Envoi en HTML (dans le corps du message)
+            // Envoi en HTML uniquement (dans le corps du message)
             $html_content = $export->generateHTMLContent($filter_type, $filter_year, $show_previsionnel);
 
             // Créer l'email HTML
@@ -90,8 +90,47 @@ if ($action == 'send_email') {
                 $sendcontext
             );
 
+        } elseif ($email_format == 'both') {
+            // Envoi PDF + HTML (pièce jointe + corps du message)
+            require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+
+            $tmp_dir = $conf->revenuesharing->dir_temp;
+            if (!is_dir($tmp_dir)) {
+                dol_mkdir($tmp_dir);
+            }
+
+            $filename = 'releve_compte_'.$export->collaborator_data->label.'_'.dol_now().'.pdf';
+            $filepath = $tmp_dir.'/'.$filename;
+
+            // Générer le PDF
+            $pdf_content = $export->exportToPDF($filter_type, $filter_year, $show_previsionnel, true);
+            file_put_contents($filepath, $pdf_content);
+
+            // Générer le HTML avec style PDF
+            $html_content = $export->generateHTMLPDFStyle($filter_type, $filter_year, $show_previsionnel);
+
+            // Créer l'email avec PDF en pièce jointe et HTML dans le corps
+            $mail = new CMailFile(
+                $email_subject,
+                $email_to,
+                $from,
+                $html_content,
+                array($filepath),
+                array(),
+                array(),
+                '',
+                '',
+                0,
+                1, // msgishtml = 1 pour HTML
+                '',
+                '',
+                $trackid,
+                '',
+                $sendcontext
+            );
+
         } else {
-            // Envoi en PDF (pièce jointe)
+            // Envoi en PDF uniquement (pièce jointe)
             require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 
             $tmp_dir = $conf->revenuesharing->dir_temp;
@@ -130,7 +169,7 @@ if ($action == 'send_email') {
         $result = $mail->sendfile();
 
         // Supprimer le fichier temporaire si PDF
-        if ($email_format == 'pdf' && isset($filepath)) {
+        if (($email_format == 'pdf' || $email_format == 'both') && isset($filepath)) {
             @unlink($filepath);
         }
 

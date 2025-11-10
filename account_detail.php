@@ -34,7 +34,8 @@ if (!$user->admin) {
 $id = GETPOST('id', 'int');
 $action = GETPOST('action', 'alpha');
 $filter_type = GETPOST('filter_type', 'alpha');
-$filter_year = GETPOST('filter_year', 'int');
+// Défaut à l'année en cours si le paramètre n'est pas présent, sinon utiliser la valeur (même 0)
+$filter_year = isset($_GET['filter_year']) ? GETPOST('filter_year', 'int') : date('Y');
 $collaborator_filter = GETPOST('collaborator_filter', 'int') ? GETPOST('collaborator_filter', 'int') : $id;
 $show_previsionnel = GETPOST('show_previsionnel', 'alpha') === 'yes';
 $page = GETPOST('page', 'int') ? GETPOST('page', 'int') : 1;
@@ -856,14 +857,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
             <div style="margin-bottom: 15px;">
                 <label style="display: block; font-weight: bold; margin-bottom: 5px;">Format du relevé:</label>
-                <div style="display: flex; gap: 20px;">
+                <div style="display: flex; flex-direction: column; gap: 10px;">
                     <label style="display: flex; align-items: center; cursor: pointer;">
                         <input type="radio" name="email_format" value="pdf" checked style="margin-right: 5px;">
-                        <span>PDF (pièce jointe)</span>
+                        <span>PDF uniquement (pièce jointe)</span>
                     </label>
                     <label style="display: flex; align-items: center; cursor: pointer;">
                         <input type="radio" name="email_format" value="html" style="margin-right: 5px;">
-                        <span>HTML (dans le corps du message)</span>
+                        <span>HTML uniquement (dans le corps du message)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="radio" name="email_format" value="both" style="margin-right: 5px;">
+                        <span>PDF + HTML (pièce jointe + corps du message)</span>
                     </label>
                 </div>
             </div>
