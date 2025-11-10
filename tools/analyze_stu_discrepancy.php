@@ -50,7 +50,126 @@ print '<style>
 .highlight-orange {
     background-color: #fff3e0;
 }
+.kpi-box {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.kpi-value {
+    font-size: 2em;
+    font-weight: bold;
+    margin: 10px 0;
+}
+.kpi-label {
+    font-size: 0.9em;
+    opacity: 0.9;
+}
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
 </style>';
+
+// ====================================================================
+// CALCUL PRÉLIMINAIRE DES DONNÉES POUR AFFICHER LES KPIs EN HAUT
+// ====================================================================
+
+// Factures STU - Calcul rapide
+$sql_factures_kpi = "SELECT
+    COUNT(DISTINCT f.rowid) as nb_factures,
+    SUM(CASE WHEN f.fk_statut IN (1,2) THEN f.total_ht ELSE 0 END) as ca_valide,
+    SUM(CASE WHEN f.fk_statut = 0 THEN 1 ELSE 0 END) as nb_brouillons
+FROM ".MAIN_DB_PREFIX."facture f
+LEFT JOIN ".MAIN_DB_PREFIX."facture_extrafields fe ON fe.fk_object = f.rowid
+WHERE YEAR(f.datef) = ".(int)$year."
+AND fe.analytique = 'STU'";
+
+$resql_kpi = $db->query($sql_factures_kpi);
+$kpi_factures = array('nb_factures' => 0, 'ca_valide' => 0, 'nb_brouillons' => 0);
+if ($resql_kpi) {
+    $obj = $db->fetch_object($resql_kpi);
+    $kpi_factures['nb_factures'] = $obj->nb_factures;
+    $kpi_factures['ca_valide'] = $obj->ca_valide;
+    $kpi_factures['nb_brouillons'] = $obj->nb_brouillons;
+    $db->free($resql_kpi);
+}
+
+// Contrats - Calcul rapide
+$sql_contracts_kpi = "SELECT
+    COUNT(*) as nb_contracts,
+    SUM(CASE WHEN status >= 1 THEN amount_ht ELSE 0 END) as ca_valide,
+    SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) as nb_brouillons
+FROM ".MAIN_DB_PREFIX."revenuesharing_contract
+WHERE YEAR(date_creation) = ".(int)$year;
+
+$resql_kpi_c = $db->query($sql_contracts_kpi);
+$kpi_contracts = array('nb_contracts' => 0, 'ca_valide' => 0, 'nb_brouillons' => 0);
+if ($resql_kpi_c) {
+    $obj = $db->fetch_object($resql_kpi_c);
+    $kpi_contracts['nb_contracts'] = $obj->nb_contracts;
+    $kpi_contracts['ca_valide'] = $obj->ca_valide;
+    $kpi_contracts['nb_brouillons'] = $obj->nb_brouillons;
+    $db->free($resql_kpi_c);
+}
+
+// Calcul de l'écart
+$ecart_kpi = $kpi_contracts['ca_valide'] - $kpi_factures['ca_valide'];
+$ecart_pct = $kpi_factures['ca_valide'] > 0 ? ($ecart_kpi / $kpi_factures['ca_valide']) * 100 : 0;
+
+// Affichage des KPIs en haut
+print '<div class="kpi-grid">';
+
+// KPI 1: Factures STU
+print '<div class="kpi-box" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">';
+print '<div class="kpi-label">📊 FACTURES STU '.$year.'</div>';
+print '<div class="kpi-value">'.price($kpi_factures['ca_valide'], 0, '', 1, -1, -1, 'EUR').'</div>';
+print '<div class="kpi-label">'.$kpi_factures['nb_factures'].' facture'.($kpi_factures['nb_factures'] > 1 ? 's' : '').' validée'.($kpi_factures['nb_factures'] > 1 ? 's' : '').'</div>';
+if ($kpi_factures['nb_brouillons'] > 0) {
+    print '<div class="kpi-label" style="opacity: 0.7;">+ '.$kpi_factures['nb_brouillons'].' brouillon'.($kpi_factures['nb_brouillons'] > 1 ? 's' : '').'</div>';
+}
+print '</div>';
+
+// KPI 2: Contrats Revenue Sharing
+print '<div class="kpi-box" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">';
+print '<div class="kpi-label">💼 CONTRATS VALIDÉS</div>';
+print '<div class="kpi-value">'.price($kpi_contracts['ca_valide'], 0, '', 1, -1, -1, 'EUR').'</div>';
+print '<div class="kpi-label">'.$kpi_contracts['nb_contracts'].' contrat'.($kpi_contracts['nb_contracts'] > 1 ? 's' : '').' au total</div>';
+if ($kpi_contracts['nb_brouillons'] > 0) {
+    print '<div class="kpi-label" style="opacity: 0.7;">'.$kpi_contracts['nb_brouillons'].' brouillon'.($kpi_contracts['nb_brouillons'] > 1 ? 's' : '').'</div>';
+}
+print '</div>';
+
+// KPI 3: Écart
+$ecart_color = abs($ecart_kpi) < 1 ? '#4facfe 0%, #00f2fe 100%' : ($ecart_kpi > 0 ? '#fa709a 0%, #fee140 100%' : '#30cfd0 0%, #330867 100%');
+print '<div class="kpi-box" style="background: linear-gradient(135deg, '.$ecart_color.');">';
+print '<div class="kpi-label">⚖️ ÉCART</div>';
+print '<div class="kpi-value">'.($ecart_kpi >= 0 ? '+' : '').price($ecart_kpi, 0, '', 1, -1, -1, 'EUR').'</div>';
+if (abs($ecart_kpi) < 1) {
+    print '<div class="kpi-label">✅ Équilibre parfait</div>';
+} else {
+    print '<div class="kpi-label">'.($ecart_kpi > 0 ? 'Contrats > Factures' : 'Factures > Contrats').' ('.round(abs($ecart_pct), 1).'%)</div>';
+}
+print '</div>';
+
+// KPI 4: Statut global
+$status_color = abs($ecart_kpi) < 1 ? '#11998e 0%, #38ef7d 100%' : '#fc4a1a 0%, #f7b733 100%';
+$status_icon = abs($ecart_kpi) < 1 ? '✅' : '⚠️';
+$status_text = abs($ecart_kpi) < 1 ? 'COHÉRENT' : 'À VÉRIFIER';
+print '<div class="kpi-box" style="background: linear-gradient(135deg, '.$status_color.');">';
+print '<div class="kpi-label">🔍 STATUT</div>';
+print '<div class="kpi-value" style="font-size: 1.5em;">'.$status_icon.'</div>';
+print '<div class="kpi-label" style="font-size: 1.1em; font-weight: bold;">'.$status_text.'</div>';
+if (abs($ecart_kpi) >= 1) {
+    print '<div class="kpi-label" style="opacity: 0.9;">Analyse requise</div>';
+}
+print '</div>';
+
+print '</div>';
 
 // ====================================================================
 // PARTIE 1: Factures clients avec analytique STU
