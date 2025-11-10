@@ -93,7 +93,7 @@ if ($collaborator_id > 0) {
 
     print '<h3>Factures impayées pour '.$collaborator_fullname.' ('.date('Y').')</h3>';
 
-    // Requête pour récupérer les factures impayées du collaborateur
+    // Requête pour récupérer les factures impayées et partiellement payées du collaborateur
     // Note: le champ intervenant contient le label du collaborateur (string), pas son ID
     $sql = "SELECT
         f.rowid,
@@ -107,14 +107,16 @@ if ($collaborator_id > 0) {
         f.fk_statut,
         s.nom as client_name,
         s.rowid as client_id,
-        fe.intervenant
+        fe.intervenant,
+        (f.total_ttc - COALESCE((SELECT SUM(amount) FROM ".MAIN_DB_PREFIX."paiement_facture pf WHERE pf.fk_facture = f.rowid), 0)) as reste_a_payer
     FROM ".MAIN_DB_PREFIX."facture f
     LEFT JOIN ".MAIN_DB_PREFIX."facture_extrafields fe ON fe.fk_object = f.rowid
     LEFT JOIN ".MAIN_DB_PREFIX."societe s ON s.rowid = f.fk_soc
     WHERE YEAR(f.datef) = ".(int)$year."
     AND fe.intervenant = '".$db->escape($collaborator_fullname)."'
-    AND f.fk_statut = 1
+    AND f.fk_statut IN (1, 2)
     AND f.paye = 0
+    HAVING reste_a_payer > 0
     ORDER BY f.date_lim_reglement ASC, f.datef DESC";
 
     $resql = $db->query($sql);
@@ -158,12 +160,14 @@ if ($collaborator_id > 0) {
             // Calculer les totaux
             $total_ht_unpaid = 0;
             $total_ttc_unpaid = 0;
+            $total_reste_a_payer = 0;
             $invoices = array();
 
             while ($obj = $db->fetch_object($resql)) {
                 $invoices[] = $obj;
                 $total_ht_unpaid += $obj->total_ht;
                 $total_ttc_unpaid += $obj->total_ttc;
+                $total_reste_a_payer += $obj->reste_a_payer;
             }
 
             // Afficher les KPIs
@@ -180,8 +184,8 @@ if ($collaborator_id > 0) {
             print '</div>';
 
             print '<div style="flex: 1; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">';
-            print '<div style="font-size: 14px; opacity: 0.9; margin-bottom: 5px;">Total TTC impayé</div>';
-            print '<div style="font-size: 32px; font-weight: bold;">'.price($total_ttc_unpaid, 0, '', 1, -1, -1, 'EUR').'</div>';
+            print '<div style="font-size: 14px; opacity: 0.9; margin-bottom: 5px;">Reste à payer</div>';
+            print '<div style="font-size: 32px; font-weight: bold;">'.price($total_reste_a_payer, 0, '', 1, -1, -1, 'EUR').'</div>';
             print '</div>';
 
             print '</div>';
@@ -195,8 +199,8 @@ if ($collaborator_id > 0) {
             print '<th>Date facture</th>';
             print '<th>Échéance</th>';
             print '<th class="right">Retard (jours)</th>';
-            print '<th class="right">Total HT</th>';
             print '<th class="right">Total TTC</th>';
+            print '<th class="right">Reste à payer</th>';
             print '<th>Statut</th>';
             print '</tr>';
 
@@ -229,16 +233,24 @@ if ($collaborator_id > 0) {
                     print '-';
                 }
                 print '</td>';
-                print '<td class="right">'.price($invoice->total_ht, 0, '', 1, -1, -1, 'EUR').'</td>';
                 print '<td class="right">'.price($invoice->total_ttc, 0, '', 1, -1, -1, 'EUR').'</td>';
-                print '<td><span class="badge badge-warning">Impayée</span></td>';
+                print '<td class="right"><strong style="color: #d32f2f;">'.price($invoice->reste_a_payer, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+
+                // Statut : déterminé par le reste à payer
+                $statut_label = '';
+                if ($invoice->reste_a_payer >= $invoice->total_ttc) {
+                    $statut_label = '<span class="badge badge-danger">Impayée</span>';
+                } else {
+                    $statut_label = '<span class="badge badge-warning">Partiellement payée</span>';
+                }
+                print '<td>'.$statut_label.'</td>';
                 print '</tr>';
             }
 
             print '<tr class="liste_total">';
             print '<td colspan="5" class="right"><strong>TOTAL</strong></td>';
-            print '<td class="right"><strong>'.price($total_ht_unpaid, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
             print '<td class="right"><strong>'.price($total_ttc_unpaid, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+            print '<td class="right"><strong style="color: #d32f2f;">'.price($total_reste_a_payer, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
             print '<td></td>';
             print '</tr>';
 
@@ -282,6 +294,13 @@ if ($collaborator_id > 0) {
                     $days_display = '<strong style="color: #d32f2f;">'.$days_late.' jours</strong>';
                 }
 
+                $statut_email = '';
+                if ($invoice->reste_a_payer >= $invoice->total_ttc) {
+                    $statut_email = 'Impayée';
+                } else {
+                    $statut_email = 'Partiellement payée';
+                }
+
                 $email_html_rows .= '
                 <tr'.$row_bg.'>
                     <td style="padding: 10px; border: 1px solid #dee2e6;">'.$invoice->ref.'</td>
@@ -289,7 +308,9 @@ if ($collaborator_id > 0) {
                     <td style="padding: 10px; border: 1px solid #dee2e6;">'.dol_print_date($db->jdate($invoice->datef), 'day').'</td>
                     <td style="padding: 10px; border: 1px solid #dee2e6;">'.($due_date ? dol_print_date($due_date, 'day') : '-').'</td>
                     <td style="padding: 10px; text-align: right; border: 1px solid #dee2e6;">'.$days_display.'</td>
-                    <td style="padding: 10px; text-align: right; border: 1px solid #dee2e6;"><strong>'.price($invoice->total_ttc, 0, '', 1, -1, -1, 'EUR').'</strong></td>
+                    <td style="padding: 10px; text-align: right; border: 1px solid #dee2e6;">'.price($invoice->total_ttc, 0, '', 1, -1, -1, 'EUR').'</td>
+                    <td style="padding: 10px; text-align: right; border: 1px solid #dee2e6;"><strong style="color: #d32f2f;">'.price($invoice->reste_a_payer, 0, '', 1, -1, -1, 'EUR').'</strong></td>
+                    <td style="padding: 10px; text-align: center; border: 1px solid #dee2e6;">'.$statut_email.'</td>
                 </tr>';
             }
 
@@ -302,13 +323,13 @@ if ($collaborator_id > 0) {
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px;">
     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0;">
-        <h1 style="margin: 0; font-size: 24px;">Rappel - Factures impayées</h1>
+        <h1 style="margin: 0; font-size: 24px;">État des factures impayées</h1>
     </div>
 
     <div style="background: #f8f9fa; padding: 30px; border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 8px 8px;">
         <p>Bonjour '.dol_escape_htmltag($collaborator_fullname).',</p>
 
-        <p>Nous vous informons que vous avez actuellement <strong>'.$num.' facture'.($num > 1 ? 's' : '').' impayée'.($num > 1 ? 's' : '').'</strong> pour un montant total de <strong>'.price($total_ttc_unpaid, 0, '', 1, -1, -1, 'EUR').'</strong>.</p>
+        <p>Voici un récapitulatif de vos factures en attente de paiement. Vous avez actuellement <strong>'.$num.' facture'.($num > 1 ? 's' : '').'</strong> pour un reste à payer de <strong>'.price($total_reste_a_payer, 0, '', 1, -1, -1, 'EUR').'</strong>.</p>
 
         <h3 style="color: #667eea; margin-top: 30px;">Détail des factures :</h3>
 
@@ -320,7 +341,9 @@ if ($collaborator_id > 0) {
                     <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Date</th>
                     <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Échéance</th>
                     <th style="padding: 12px; text-align: right; border: 1px solid #dee2e6;">Retard</th>
-                    <th style="padding: 12px; text-align: right; border: 1px solid #dee2e6;">Montant TTC</th>
+                    <th style="padding: 12px; text-align: right; border: 1px solid #dee2e6;">Total TTC</th>
+                    <th style="padding: 12px; text-align: right; border: 1px solid #dee2e6;">Reste à payer</th>
+                    <th style="padding: 12px; text-align: center; border: 1px solid #dee2e6;">Statut</th>
                 </tr>
             </thead>
             <tbody>'.$email_html_rows.'
@@ -328,18 +351,17 @@ if ($collaborator_id > 0) {
             <tfoot>
                 <tr style="background: #f8f9fa; font-weight: bold;">
                     <td colspan="5" style="padding: 12px; text-align: right; border: 1px solid #dee2e6;">TOTAL</td>
-                    <td style="padding: 12px; text-align: right; border: 1px solid #dee2e6; color: #d32f2f;">'.price($total_ttc_unpaid, 0, '', 1, -1, -1, 'EUR').'</td>
+                    <td style="padding: 12px; text-align: right; border: 1px solid #dee2e6;">'.price($total_ttc_unpaid, 0, '', 1, -1, -1, 'EUR').'</td>
+                    <td style="padding: 12px; text-align: right; border: 1px solid #dee2e6; color: #d32f2f;">'.price($total_reste_a_payer, 0, '', 1, -1, -1, 'EUR').'</td>
+                    <td></td>
                 </tr>
             </tfoot>
         </table>
 
-        <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 15px; margin-top: 30px;">
-            <p style="margin: 0;"><strong>⚠️ Action requise :</strong></p>
-            <p style="margin: 10px 0 0 0;">Merci de régulariser votre situation dans les meilleurs délais. En cas de questions, n\'hésitez pas à nous contacter.</p>
+        <div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 5px; padding: 15px; margin-top: 30px;">
+            <p style="margin: 0;"><strong>ℹ️ Information :</strong></p>
+            <p style="margin: 10px 0 0 0;">Ce document est fourni à titre informatif. Pour toute question concernant ces factures, n\'hésitez pas à nous contacter.</p>
         </div>
-
-        <p style="margin-top: 30px;">Cordialement,</p>
-        <p style="margin: 5px 0;"><strong>L\'équipe Ohmnibus</strong></p>
     </div>
 
     <div style="text-align: center; margin-top: 20px; padding: 20px; color: #6c757d; font-size: 12px;">
