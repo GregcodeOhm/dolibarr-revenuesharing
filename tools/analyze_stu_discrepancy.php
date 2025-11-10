@@ -164,15 +164,17 @@ print '<h3>💼 PARTIE 2: Contrats revenuesharing pour STU</h3>';
 $sql_contracts = "SELECT
     c.rowid,
     c.ref,
-    c.invoice_ref,
+    c.fk_facture,
+    f.ref as facture_ref,
     c.amount_ht,
     c.studio_amount_ht,
     c.collaborator_amount_ht,
     c.status,
     c.date_creation,
-    col.name as collaborator_name
+    col.label as collaborator_name
 FROM ".MAIN_DB_PREFIX."revenuesharing_contract c
 LEFT JOIN ".MAIN_DB_PREFIX."revenuesharing_collaborator col ON col.rowid = c.fk_collaborator
+LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = c.fk_facture
 WHERE YEAR(c.date_creation) = ".(int)$year."
 ORDER BY c.date_creation DESC, c.ref DESC";
 
@@ -235,7 +237,7 @@ if ($resql_contracts) {
 
         print '<tr class="oddeven '.$rowclass.'">';
         print '<td>'.$contract->ref.'</td>';
-        print '<td>'.$contract->invoice_ref.'</td>';
+        print '<td>'.($contract->facture_ref ? '<a href="'.DOL_URL_ROOT.'/compta/facture/card.php?facid='.$contract->fk_facture.'" target="_blank">'.$contract->facture_ref.'</a>' : '<em>N/A</em>').'</td>';
         print '<td>'.dol_print_date($db->jdate($contract->date_creation), 'day').'</td>';
         print '<td>'.($contract->collaborator_name ? $contract->collaborator_name : '<em>N/A</em>').'</td>';
         print '<td class="right"><strong>'.price($contract->amount_ht, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
@@ -319,14 +321,14 @@ print '<h3>🔗 PARTIE 4: Vérification des correspondances</h3>';
 
 print '<p>Analyse de la correspondance entre factures STU et contrats revenuesharing basée sur invoice_ref...</p>';
 
-// Créer un mapping invoice_ref -> contract
+// Créer un mapping facture_ref -> contract
 $contract_by_invoice = array();
 foreach ($contracts as $contract) {
-    if (!empty($contract->invoice_ref)) {
-        if (!isset($contract_by_invoice[$contract->invoice_ref])) {
-            $contract_by_invoice[$contract->invoice_ref] = array();
+    if (!empty($contract->facture_ref)) {
+        if (!isset($contract_by_invoice[$contract->facture_ref])) {
+            $contract_by_invoice[$contract->facture_ref] = array();
         }
-        $contract_by_invoice[$contract->invoice_ref][] = $contract;
+        $contract_by_invoice[$contract->facture_ref][] = $contract;
     }
 }
 
