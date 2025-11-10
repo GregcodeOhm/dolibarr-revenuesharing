@@ -57,6 +57,15 @@ print '<h3 style="margin: 0; color: #155724;">Module Revenue Sharing Opérationn
 print '<p style="margin: 5px 0 0 0;">Bienvenue '.$user->getFullName($langs).' ! Le module fonctionne correctement.</p>';
 print '</div>';
 
+// Lien vers l'outil d'analyse STU
+print '<div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 5px; padding: 15px; margin: 15px 0;">';
+print '<h4 style="margin: 0 0 10px 0; color: #01579b;">🔍 Outils d\'analyse</h4>';
+print '<a href="'.dol_buildpath('/revenuesharing/tools/analyze_stu_discrepancy.php', 1).'" class="button" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">';
+print '📊 Analyser les écarts CA STU';
+print '</a>';
+print ' <span style="margin-left: 10px; color: #666;">Comparez les factures STU avec les contrats revenuesharing</span>';
+print '</div>';
+
 // Statistiques générales (via repositories avec cache)
 try {
     // 1. Nombre de collaborateurs
