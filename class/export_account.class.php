@@ -798,5 +798,205 @@ class ExportAccount
         $pdf->Line(10, $pdf->GetY(), 200, $pdf->GetY());
         $pdf->Ln(5);
     }
+
+    /**
+     * Génère le contenu PDF et le retourne (pour envoi par email)
+     */
+    public function generatePDFContent($filter_type = '', $filter_year = 0, $show_previsionnel = false)
+    {
+        global $conf, $langs;
+
+        // Calculer les statistiques avec solde cumulé si filtré par année
+        $filtered_credits = 0;
+        $filtered_debits = 0;
+        $filtered_balance = 0;
+        $previous_balance = 0;
+        $filtered_count = count($this->transactions);
+
+        // Si filtre par année, calculer le solde reporté (transactions + salaires)
+        if ($filter_year > 0) {
+            // Transactions classiques
+            $sql_previous = "SELECT COALESCE(SUM(t.amount), 0) as previous_balance
+                FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+                LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
+                LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
+                WHERE t.fk_collaborator = ".$this->collaborator_id." AND t.status = 1
+                AND YEAR(COALESCE(f.datef, ff.datef, t.transaction_date)) < ".$filter_year;
+
+            $resql_previous = $this->db->query($sql_previous);
+            if ($resql_previous) {
+                $previous_balance = $this->db->fetch_object($resql_previous)->previous_balance;
+                $this->db->free($resql_previous);
+            }
+
+            // Soustraire les salaires payés des années précédentes
+            $sql_previous_salaries = "SELECT COALESCE(SUM(solde_utilise), 0) as previous_salaries
+                FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration
+                WHERE fk_collaborator = ".$this->collaborator_id." AND status = 3
+                AND declaration_year < ".$filter_year;
+
+            $resql_previous_salaries = $this->db->query($sql_previous_salaries);
+            if ($resql_previous_salaries) {
+                $previous_salaries = $this->db->fetch_object($resql_previous_salaries)->previous_salaries;
+                $previous_balance -= $previous_salaries;
+                $this->db->free($resql_previous_salaries);
+            }
+        }
+
+        foreach ($this->transactions as $trans) {
+            if ($trans->amount > 0) {
+                $filtered_credits += $trans->amount;
+            } else {
+                $filtered_debits += abs($trans->amount);
+            }
+            $filtered_balance += $trans->amount;
+        }
+
+        // Solde cumulé = solde reporté + mouvements de l'année
+        $cumulative_balance = $previous_balance + $filtered_balance;
+
+        // Utiliser la classe PDF de Dolibarr
+        require_once DOL_DOCUMENT_ROOT.'/core/lib/pdf.lib.php';
+
+        // Créer le PDF avec TCPDF (inclus dans Dolibarr)
+        $pdf = pdf_getInstance();
+        $pdf->SetMargins(10, 10, 10);
+        $pdf->SetAutoPageBreak(true, 15);
+        $pdf->AddPage();
+
+        // En-tête avec logo
+        $this->addPDFHeader($pdf);
+
+        // Titre principal
+        $pdf->SetFont('helvetica', 'B', 16);
+        $pdf->Cell(0, 10, 'RELEVÉ DE COMPTE COLLABORATEUR', 0, 1, 'C');
+        $pdf->Ln(5);
+
+        // Infos collaborateur
+        $pdf->SetFont('helvetica', 'B', 12);
+        $pdf->Cell(0, 8, 'Collaborateur: '.$this->collaborator_data->label, 0, 1);
+
+        if ($this->collaborator_data->firstname && $this->collaborator_data->lastname) {
+            $pdf->SetFont('helvetica', '', 10);
+            $pdf->Cell(0, 6, 'Nom complet: '.$this->collaborator_data->firstname.' '.$this->collaborator_data->lastname, 0, 1);
+        }
+
+        if ($this->collaborator_data->email) {
+            $pdf->Cell(0, 6, 'Email: '.$this->collaborator_data->email, 0, 1);
+        }
+
+        $pdf->Cell(0, 6, 'Date: '.dol_print_date(dol_now(), 'daytext'), 0, 1);
+        $pdf->Ln(5);
+
+        // Section Chiffre d'Affaires & Répartition
+        if ($this->ca_info && $this->ca_info->ca_total_ht > 0) {
+            $pdf->SetFont('helvetica', 'B', 12);
+            $ca_title = 'CHIFFRE D\'AFFAIRES & RÉPARTITION';
+            if ($filter_year > 0) {
+                $ca_title .= ' ('.$filter_year.')';
+            }
+            $pdf->Cell(0, 8, $ca_title, 0, 1);
+            $pdf->SetFont('helvetica', '', 10);
+
+            // Chiffre d'affaires global
+            $pdf->Cell(60, 6, 'CA HT:', 0, 0);
+            $pdf->Cell(0, 6, price($this->ca_info->ca_total_ht).' €', 0, 1);
+
+            $pdf->Cell(60, 6, 'Nombre de factures:', 0, 0);
+            $pdf->Cell(0, 6, $this->ca_info->nb_factures_clients, 0, 1);
+
+            // Répartition des montants
+            if ($this->ca_info->collaborator_total_ht > 0 || $this->ca_info->studio_total_ht > 0) {
+                $pdf->Ln(3);
+                $pdf->SetFont('helvetica', 'B', 11);
+                $pdf->Cell(0, 6, 'Répartition des montants:', 0, 1);
+                $pdf->SetFont('helvetica', '', 10);
+
+                $pdf->Cell(60, 6, 'Part Collaborateur:', 0, 0);
+                $pdf->Cell(0, 6, price($this->ca_info->collaborator_total_ht).' €', 0, 1);
+
+                $pdf->Cell(60, 6, 'Part Structure:', 0, 0);
+                $pdf->Cell(0, 6, price($this->ca_info->studio_total_ht).' €', 0, 1);
+
+                if ($this->ca_info->avg_percentage > 0) {
+                    $pdf->Cell(60, 6, 'Pourcentage moyen:', 0, 0);
+                    $pdf->Cell(0, 6, number_format($this->ca_info->avg_percentage, 1).'%', 0, 1);
+                }
+            }
+
+            $pdf->Cell(60, 6, 'Nombre de contrats:', 0, 0);
+            $pdf->Cell(0, 6, $this->ca_info->nb_contrats, 0, 1);
+        }
+
+        $pdf->Ln(5);
+
+        // === RÉSUMÉ FINANCIER ===
+        $pdf->SetX(10);
+
+        $pdf->SetFont('helvetica', 'B', 12);
+        $resume_title = 'RÉSUMÉ FINANCIER';
+        if ($filter_type || $filter_year) {
+            $resume_title .= ' (FILTRÉ)';
+        }
+        $pdf->Cell(0, 8, $resume_title, 0, 1);
+        $pdf->SetFont('helvetica', '', 10);
+
+        // Utiliser les données filtrées si des filtres sont appliqués, sinon les globales
+        $display_balance = ($filter_type || $filter_year) ? $cumulative_balance : $this->balance_info->current_balance;
+        $display_credits = ($filter_type || $filter_year) ? $filtered_credits : $this->balance_info->total_credits;
+        $display_debits = ($filter_type || $filter_year) ? $filtered_debits : $this->balance_info->total_debits;
+        $display_count = ($filter_type || $filter_year) ? $filtered_count : $this->balance_info->nb_transactions;
+
+        // Si filtré par année, afficher le solde reporté d'abord
+        if ($filter_year > 0) {
+            $pdf->Cell(60, 6, 'Solde reporté:', 0, 0);
+            $pdf->Cell(0, 6, price($previous_balance).' €', 0, 1);
+        }
+
+        // Afficher les mouvements de l'année ou totaux
+        if ($filter_year > 0) {
+            $pdf->Cell(60, 6, 'Crédits '.$filter_year.':', 0, 0);
+            $pdf->Cell(0, 6, price($display_credits).' €', 0, 1);
+
+            $pdf->Cell(60, 6, 'Débits '.$filter_year.':', 0, 0);
+            $pdf->Cell(0, 6, price($display_debits).' €', 0, 1);
+        } else {
+            $pdf->Cell(60, 6, 'Total crédits:', 0, 0);
+            $pdf->Cell(0, 6, price($display_credits).' €', 0, 1);
+
+            $pdf->Cell(60, 6, 'Total débits:', 0, 0);
+            $pdf->Cell(0, 6, price($display_debits).' €', 0, 1);
+        }
+
+        $pdf->Cell(60, 6, 'Nb transactions:', 0, 0);
+        $pdf->Cell(0, 6, $display_count, 0, 1);
+
+        // Solde cumulé en dernier, mis en évidence
+        $pdf->Cell(60, 6, 'Solde cumulé:', 0, 0);
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->Cell(0, 6, price($display_balance).' €', 0, 1);
+        $pdf->SetFont('helvetica', '', 10);
+
+        // Indication sur l'inclusion/exclusion des prévisionnels dans le solde
+        if ($show_previsionnel) {
+            $pdf->SetFont('helvetica', 'I', 8);
+            $pdf->SetTextColor(0, 124, 186);
+            $pdf->Cell(0, 4, 'Inclut les contrats prévisionnels', 0, 1);
+        } else {
+            $pdf->SetFont('helvetica', 'I', 8);
+            $pdf->SetTextColor(102, 102, 102);
+            $pdf->Cell(0, 4, 'Contrats réels uniquement', 0, 1);
+        }
+        $pdf->SetTextColor(0, 0, 0);
+
+        // Pied de page
+        $pdf->Ln(10);
+        $pdf->SetFont('helvetica', '', 8);
+        $pdf->Cell(0, 6, 'Document généré le '.dol_print_date(dol_now(), 'dayhourtext'), 0, 1, 'C');
+        $pdf->Cell(0, 6, 'Module Revenue Sharing - Dolibarr', 0, 1, 'C');
+
+        // Retourner le contenu du PDF au lieu de le télécharger
+        return $pdf->Output('', 'S');
+    }
 }
 ?>

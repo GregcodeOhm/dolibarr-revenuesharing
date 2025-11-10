@@ -543,6 +543,7 @@ print '<input type="hidden" name="show_previsionnel" value="'.($show_previsionne
 
 print '<button type="submit" name="format" value="pdf" class="butAction" style="background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">'.img_picto('', 'pdf', 'class="pictofixedwidth"').' Export PDF</button>';
 print '<button type="submit" name="format" value="excel" class="butAction" style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">'.img_picto('', 'object_xls', 'class="pictofixedwidth"').' Export Excel</button>';
+print '<button type="button" onclick="showEmailModal()" class="butAction" style="background: #007cba; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">'.img_picto('', 'email', 'class="pictofixedwidth"').' Envoyer par email</button>';
 
 if ($filter_type || $filter_year) {
     print '<small style="color: var(--colortextbackhmenu); font-style: italic;">Avec filtres: ';
@@ -833,8 +834,76 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!-- Modal d'envoi par email -->
+<div id="emailModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div style="background-color: white; margin: 5% auto; border-radius: 8px; width: 90%; max-width: 600px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
+        <div style="padding: 20px; border-bottom: 1px solid #ddd;">
+            <h3 style="margin: 0; color: #007cba;">Envoyer le relevé de compte par email</h3>
+        </div>
+
+        <form method="POST" action="export_account.php" style="padding: 20px;">
+            <input type="hidden" name="action" value="send_email">
+            <input type="hidden" name="id" value="<?php echo $id; ?>">
+            <input type="hidden" name="format" value="pdf">
+            <input type="hidden" name="token" value="<?php echo newToken(); ?>">
+            <?php if ($filter_type): ?>
+            <input type="hidden" name="filter_type" value="<?php echo $filter_type; ?>">
+            <?php endif; ?>
+            <?php if ($filter_year): ?>
+            <input type="hidden" name="filter_year" value="<?php echo $filter_year; ?>">
+            <?php endif; ?>
+            <input type="hidden" name="show_previsionnel" value="<?php echo $show_previsionnel ? '1' : '0'; ?>">
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Adresse email du destinataire:</label>
+                <input type="email" name="email_to" id="email_to" value="<?php echo dol_escape_htmltag($collaborator->email); ?>" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" required>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Objet de l'email:</label>
+                <input type="text" name="email_subject" id="email_subject" value="Votre relevé de compte<?php echo $filter_year ? ' - '.$filter_year : ''; ?>" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" required>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Message:</label>
+                <textarea name="email_message" id="email_message" rows="6" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">Bonjour <?php echo dol_escape_htmltag($collaborator->label); ?>,
+
+Veuillez trouver ci-joint votre relevé de compte<?php echo $filter_year ? ' pour l\'année '.$filter_year : ''; ?>.
+
+Cordialement,
+<?php echo $conf->global->MAIN_INFO_SOCIETE_NOM; ?></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: space-between;">
+                <button type="button" onclick="closeEmailModal()" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">Annuler</button>
+                <button type="submit" style="background: #007cba; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;"><?php print img_picto('', 'email'); ?> Envoyer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showEmailModal() {
+    document.getElementById('emailModal').style.display = 'block';
+}
+
+function closeEmailModal() {
+    document.getElementById('emailModal').style.display = 'none';
+}
+
+// Fermer le modal si on clique en dehors
+window.onclick = function(event) {
+    var modal = document.getElementById('emailModal');
+    if (event.target == modal) {
+        closeEmailModal();
+    }
+}
+</script>
+
 <!-- JavaScript externe -->
 <script src="js/account_detail.js"></script>
 
+<?php
+llxFooter();
 $db->close();
 ?>
