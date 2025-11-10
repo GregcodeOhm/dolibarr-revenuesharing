@@ -50,19 +50,34 @@ class ExportAccount
         $this->collaborator_data = $this->db->fetch_object($resql_collab);
         $this->db->free($resql_collab);
         
-        // Récupérer le solde actuel
-        $sql_balance = "SELECT 
+        // Récupérer le solde actuel (transactions)
+        $sql_balance = "SELECT
             COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as total_credits,
             COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) as total_debits,
-            COALESCE(SUM(amount), 0) as current_balance,
+            COALESCE(SUM(amount), 0) as transactions_balance,
             COUNT(*) as nb_transactions,
             MAX(transaction_date) as last_transaction_date
-            FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction 
+            FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction
             WHERE fk_collaborator = ".$this->collaborator_id." AND status = 1";
-        
+
         $resql_balance = $this->db->query($sql_balance);
         $this->balance_info = $this->db->fetch_object($resql_balance);
         $this->db->free($resql_balance);
+
+        // Récupérer le total des salaires payés à soustraire
+        $sql_salaries = "SELECT COALESCE(SUM(solde_utilise), 0) as total_salaries
+            FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration
+            WHERE fk_collaborator = ".$this->collaborator_id." AND status = 3";
+
+        $resql_salaries = $this->db->query($sql_salaries);
+        if ($resql_salaries) {
+            $total_salaries = $this->db->fetch_object($resql_salaries)->total_salaries;
+            $this->db->free($resql_salaries);
+            // Le solde actuel = solde des transactions - salaires payés
+            $this->balance_info->current_balance = $this->balance_info->transactions_balance - $total_salaries;
+        } else {
+            $this->balance_info->current_balance = $this->balance_info->transactions_balance;
+        }
         
         return true;
     }
