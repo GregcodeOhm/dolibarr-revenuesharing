@@ -19,6 +19,11 @@ llxHeader('', 'Analyse Différences CA STU', '');
 
 print load_fiche_titre('🔍 Analyse des différences CA STU', '', 'generic');
 
+// Note: On va calculer les anomalies en deux passes pour afficher l'alerte en haut
+// Première passe rapide pour compter
+$has_anomalies = false;
+$anomaly_count = 0;
+
 // Formulaire de sélection d'année
 print '<form method="GET" action="'.$_SERVER['PHP_SELF'].'" style="margin-bottom: 20px;">';
 print 'Année : <select name="year" onchange="this.form.submit()">';
@@ -392,14 +397,223 @@ foreach ($factures as $fac) {
 print '</table>';
 
 // Résumé des anomalies
+$total_anomalies = count($factures_sans_contrat) + count($factures_avec_contrat_multiple) + count($factures_avec_difference);
+
+// Alerte globale en haut si anomalies détectées
+if ($total_anomalies > 0) {
+    print '<div style="position: sticky; top: 10px; z-index: 1000; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: white; border: 3px solid #c92a2a; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: pulse 2s infinite;">';
+    print '<div style="display: flex; align-items: center; gap: 20px;">';
+    print '<div style="font-size: 3em;">🚨</div>';
+    print '<div style="flex: 1;">';
+    print '<h2 style="margin: 0; color: white; font-size: 1.5em;">ATTENTION: '.$total_anomalies.' anomalie'.($total_anomalies > 1 ? 's' : '').' détectée'.($total_anomalies > 1 ? 's' : '').' !</h2>';
+    print '<p style="margin: 5px 0 0 0; font-size: 1.1em;">';
+    if (count($factures_sans_contrat) > 0) {
+        print '• <strong>'.count($factures_sans_contrat).'</strong> facture'.( count($factures_sans_contrat) > 1 ? 's' : '').' sans contrat &nbsp; ';
+    }
+    if (count($factures_avec_contrat_multiple) > 0) {
+        print '• <strong>'.count($factures_avec_contrat_multiple).'</strong> doublon'.( count($factures_avec_contrat_multiple) > 1 ? 's' : '').' &nbsp; ';
+    }
+    if (count($factures_avec_difference) > 0) {
+        print '• <strong>'.count($factures_avec_difference).'</strong> différence'.( count($factures_avec_difference) > 1 ? 's' : '').' de montant';
+    }
+    print '</p>';
+    print '</div>';
+    print '<div><a href="#partie5" style="background: white; color: #c92a2a; padding: 15px 25px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 1.1em; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">⬇️ Voir les détails</a></div>';
+    print '</div>';
+    print '</div>';
+
+    print '<style>
+    @keyframes pulse {
+        0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        50% { box-shadow: 0 4px 20px rgba(255,107,107,0.6), 0 0 30px rgba(255,107,107,0.4); }
+    }
+    </style>';
+}
+
 print '<div style="background: #ffebee; padding: 15px; border-radius: 5px; margin-top: 20px;">';
 print '<strong>🚨 Anomalies détectées :</strong><br><br>';
 print '• Factures STU sans contrat: <strong>'.count($factures_sans_contrat).'</strong><br>';
 print '• Factures avec multiples contrats: <strong>'.count($factures_avec_contrat_multiple).'</strong><br>';
 print '• Factures avec différence de montant: <strong>'.count($factures_avec_difference).'</strong><br>';
+print '<br><strong style="font-size: 1.2em;">Total anomalies: '.$total_anomalies.'</strong>';
 print '</div>';
 
 print '</div>';
+
+// ====================================================================
+// PARTIE 5: ALERTES ET DÉTAILS DES PROBLÈMES
+// ====================================================================
+if ($total_anomalies > 0) {
+    print '<div class="analysis-section" id="partie5">';
+    print '<h3>⚠️ PARTIE 5: Détail des problèmes à corriger</h3>';
+
+    // Section 1: Factures sans contrat
+    if (count($factures_sans_contrat) > 0) {
+        print '<div style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 5px; padding: 15px; margin-bottom: 20px;">';
+        print '<h4 style="color: #856404; margin-top: 0;">❌ FACTURES SANS CONTRAT ('.count($factures_sans_contrat).')</h4>';
+        print '<p>Ces factures STU validées/payées n\'ont pas de contrat revenuesharing associé. Cela crée un écart dans le CA.</p>';
+
+        print '<table class="noborder centpercent">';
+        print '<tr class="liste_titre">';
+        print '<th>Réf Facture</th>';
+        print '<th>Date</th>';
+        print '<th>Client</th>';
+        print '<th>Intervenant</th>';
+        print '<th class="right">Montant HT</th>';
+        print '<th class="center">Action</th>';
+        print '</tr>';
+
+        $total_manquant = 0;
+        foreach ($factures_sans_contrat as $fac) {
+            $total_manquant += $fac->total_ht;
+            print '<tr class="oddeven highlight-red">';
+            print '<td><a href="'.DOL_URL_ROOT.'/compta/facture/card.php?facid='.$fac->rowid.'" target="_blank"><strong>'.$fac->ref.'</strong></a></td>';
+            print '<td>'.dol_print_date($db->jdate($fac->datef), 'day').'</td>';
+            print '<td>'.$fac->client_nom.'</td>';
+            print '<td>'.($fac->intervenant ? $fac->intervenant : '<em>Non défini</em>').'</td>';
+            print '<td class="right"><strong style="color: #d32f2f;">'.price($fac->total_ht, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+            print '<td class="center"><a href="'.DOL_URL_ROOT.'/custom/revenuesharing/contract_card.php?action=create&facid='.$fac->rowid.'" class="button" target="_blank">Créer contrat</a></td>';
+            print '</tr>';
+        }
+
+        print '<tr class="liste_titre">';
+        print '<td colspan="4" class="right"><strong>TOTAL MANQUANT:</strong></td>';
+        print '<td class="right"><strong style="font-size: 1.2em; color: #d32f2f;">'.price($total_manquant, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+        print '<td></td>';
+        print '</tr>';
+        print '</table>';
+        print '</div>';
+    }
+
+    // Section 2: Factures avec multiples contrats (doublons)
+    if (count($factures_avec_contrat_multiple) > 0) {
+        print '<div style="background: #ffe0b2; border: 2px solid #ff9800; border-radius: 5px; padding: 15px; margin-bottom: 20px;">';
+        print '<h4 style="color: #e65100; margin-top: 0;">🔁 DOUBLONS - FACTURES AVEC MULTIPLES CONTRATS ('.count($factures_avec_contrat_multiple).')</h4>';
+        print '<p>Ces factures ont plusieurs contrats associés. Cela peut créer un CA gonflé si les contrats sont tous validés.</p>';
+
+        foreach ($factures_avec_contrat_multiple as $fac) {
+            $contracts_linked = $contract_by_invoice[$fac->ref];
+            $total_contracts_ht = 0;
+            foreach ($contracts_linked as $c) {
+                $total_contracts_ht += $c->amount_ht;
+            }
+
+            print '<div style="background: white; padding: 10px; margin-bottom: 10px; border-left: 4px solid #ff9800;">';
+            print '<strong>Facture: <a href="'.DOL_URL_ROOT.'/compta/facture/card.php?facid='.$fac->rowid.'" target="_blank">'.$fac->ref.'</a></strong> - ';
+            print 'Montant facture: <strong>'.price($fac->total_ht, 0, '', 1, -1, -1, 'EUR').'</strong><br>';
+            print '<strong style="color: #e65100;">⚠️ '.count($contracts_linked).' contrats trouvés (total: '.price($total_contracts_ht, 0, '', 1, -1, -1, 'EUR').')</strong><br>';
+
+            print '<table class="noborder" style="width: 100%; margin-top: 10px;">';
+            print '<tr class="liste_titre" style="font-size: 0.9em;">';
+            print '<th>Réf Contrat</th>';
+            print '<th>Collaborateur</th>';
+            print '<th class="right">Montant HT</th>';
+            print '<th class="center">Statut</th>';
+            print '<th class="center">Action</th>';
+            print '</tr>';
+
+            foreach ($contracts_linked as $contract) {
+                $statut_libelle = '';
+                $rowclass = '';
+                if ($contract->status == 0) {
+                    $statut_libelle = '📝 Brouillon';
+                    $rowclass = 'highlight-orange';
+                } elseif ($contract->status == 1) {
+                    $statut_libelle = '✅ Validé';
+                } elseif ($contract->status >= 2) {
+                    $statut_libelle = '💰 Payé';
+                }
+
+                print '<tr class="oddeven '.$rowclass.'" style="font-size: 0.9em;">';
+                print '<td><a href="'.DOL_URL_ROOT.'/custom/revenuesharing/contract_card.php?id='.$contract->rowid.'" target="_blank">'.$contract->ref.'</a></td>';
+                print '<td>'.($contract->collaborator_name ? $contract->collaborator_name : 'N/A').'</td>';
+                print '<td class="right">'.price($contract->amount_ht, 0, '', 1, -1, -1, 'EUR').'</td>';
+                print '<td class="center">'.$statut_libelle.'</td>';
+                print '<td class="center">';
+                if ($contract->status == 0) {
+                    print '<a href="'.DOL_URL_ROOT.'/custom/revenuesharing/contract_card.php?id='.$contract->rowid.'&action=delete" class="button" style="background: #d32f2f; color: white;" target="_blank">Supprimer</a>';
+                } else {
+                    print '<em style="color: #666;">Validé</em>';
+                }
+                print '</td>';
+                print '</tr>';
+            }
+            print '</table>';
+            print '</div>';
+        }
+        print '</div>';
+    }
+
+    // Section 3: Factures avec différence de montant
+    if (count($factures_avec_difference) > 0) {
+        print '<div style="background: #e1f5fe; border: 2px solid #03a9f4; border-radius: 5px; padding: 15px; margin-bottom: 20px;">';
+        print '<h4 style="color: #01579b; margin-top: 0;">⚖️ DIFFÉRENCES DE MONTANT ('.count($factures_avec_difference).')</h4>';
+        print '<p>Le montant du contrat ne correspond pas exactement au montant de la facture.</p>';
+
+        print '<table class="noborder centpercent">';
+        print '<tr class="liste_titre">';
+        print '<th>Réf Facture</th>';
+        print '<th class="right">Montant Facture</th>';
+        print '<th class="right">Montant Contrat(s)</th>';
+        print '<th class="right">Écart</th>';
+        print '<th class="center">Action</th>';
+        print '</tr>';
+
+        foreach ($factures_avec_difference as $fac) {
+            $contracts_linked = $contract_by_invoice[$fac->ref];
+            $total_contracts_ht = 0;
+            foreach ($contracts_linked as $c) {
+                $total_contracts_ht += $c->amount_ht;
+            }
+            $ecart = $total_contracts_ht - $fac->total_ht;
+
+            print '<tr class="oddeven highlight-orange">';
+            print '<td><a href="'.DOL_URL_ROOT.'/compta/facture/card.php?facid='.$fac->rowid.'" target="_blank">'.$fac->ref.'</a></td>';
+            print '<td class="right">'.price($fac->total_ht, 0, '', 1, -1, -1, 'EUR').'</td>';
+            print '<td class="right">'.price($total_contracts_ht, 0, '', 1, -1, -1, 'EUR').'</td>';
+            print '<td class="right"><strong style="color: '.($ecart > 0 ? '#f44336' : '#4CAF50').';">'.price($ecart, 0, '', 1, -1, -1, 'EUR').'</strong></td>';
+            print '<td class="center">';
+            if (count($contracts_linked) == 1) {
+                print '<a href="'.DOL_URL_ROOT.'/custom/revenuesharing/contract_card.php?id='.$contracts_linked[0]->rowid.'&action=edit" class="button" target="_blank">Corriger</a>';
+            } else {
+                print '<em>Multiples contrats</em>';
+            }
+            print '</td>';
+            print '</tr>';
+        }
+        print '</table>';
+        print '</div>';
+    }
+
+    // Récapitulatif des actions à mener
+    print '<div style="background: #f3e5f5; border: 2px solid #9c27b0; border-radius: 5px; padding: 15px;">';
+    print '<h4 style="color: #4a148c; margin-top: 0;">📋 PLAN D\'ACTION RECOMMANDÉ</h4>';
+    print '<ol style="line-height: 1.8;">';
+
+    if (count($factures_sans_contrat) > 0) {
+        print '<li><strong>Créer les contrats manquants</strong> pour les '.count($factures_sans_contrat).' factures STU sans contrat (cliquez sur "Créer contrat")</li>';
+    }
+
+    if (count($factures_avec_contrat_multiple) > 0) {
+        print '<li><strong>Supprimer les doublons</strong> : Identifiez le bon contrat et supprimez les '.count($factures_avec_contrat_multiple).' autres (brouillons uniquement)</li>';
+    }
+
+    if (count($factures_avec_difference) > 0) {
+        print '<li><strong>Corriger les montants</strong> des '.count($factures_avec_difference).' contrats qui ne correspondent pas aux factures</li>';
+    }
+
+    print '<li><strong>Vérifier régulièrement</strong> cet outil après chaque import de factures STU</li>';
+    print '<li><strong>Actualiser les stats</strong> du dashboard après les corrections (bouton "🔄 Actualiser les stats")</li>';
+    print '</ol>';
+    print '</div>';
+
+    print '</div>';
+} else {
+    print '<div class="analysis-section" style="background: #d4edda; border: 2px solid #28a745; color: #155724;">';
+    print '<h3 style="margin-top: 0;">✅ Aucun problème détecté !</h3>';
+    print '<p style="font-size: 1.1em;">Toutes les factures STU ont un contrat correspondant avec les bons montants. Le CA est cohérent.</p>';
+    print '</div>';
+}
 
 llxFooter();
 $db->close();
