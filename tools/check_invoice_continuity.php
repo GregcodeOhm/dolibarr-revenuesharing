@@ -22,6 +22,12 @@ llxHeader('', 'Vérification Continuité Factures', '');
 
 print load_fiche_titre('🔢 Vérification de la continuité des numéros de factures', '', 'bill');
 
+print '<div class="info" style="background: #e3f2fd; padding: 15px; margin: 15px 0; border-left: 4px solid #007bff; border-radius: 4px;">';
+print '<strong>ℹ️ Format détecté :</strong> FA{YYMM}-{NNNN} (ex: FA2501-0696)<br>';
+print 'La numérotation est continue sur toutes les années (696, 697, 698...), pas par année.<br>';
+print 'Cet outil vérifie la continuité de TOUS les numéros utilisés dans l\'année sélectionnée.';
+print '</div>';
+
 print '<style>
 .continuity-section {
     background: white;
@@ -379,6 +385,76 @@ print '<div class="value">'.$validated_count.'</div>';
 print '<div class="label">Validées (statut 1-2)</div>';
 print '</div>';
 
+print '</div>';
+
+// Analyse par mois
+$months_data = array();
+foreach ($invoices as $num => $inv) {
+    $month = date('Y-m', $db->jdate($inv['date']));
+    if (!isset($months_data[$month])) {
+        $months_data[$month] = array(
+            'numbers' => array(),
+            'count' => 0,
+            'min' => null,
+            'max' => null
+        );
+    }
+    $months_data[$month]['numbers'][] = $num;
+    $months_data[$month]['count']++;
+    if ($months_data[$month]['min'] === null || $num < $months_data[$month]['min']) {
+        $months_data[$month]['min'] = $num;
+    }
+    if ($months_data[$month]['max'] === null || $num > $months_data[$month]['max']) {
+        $months_data[$month]['max'] = $num;
+    }
+}
+
+ksort($months_data);
+
+print '<div class="continuity-section">';
+print '<h3>📅 Analyse par mois</h3>';
+print '<table class="invoice-table" style="width: auto; min-width: 600px;">';
+print '<thead>';
+print '<tr>';
+print '<th>Mois</th>';
+print '<th>Nb factures</th>';
+print '<th>Plage numéros</th>';
+print '<th>Trous</th>';
+print '</tr>';
+print '</thead>';
+print '<tbody>';
+
+foreach ($months_data as $month => $data) {
+    $month_name = dol_print_date(strtotime($month.'-01'), '%B %Y');
+
+    // Calculer les trous dans ce mois
+    $month_gaps = array();
+    if ($data['min'] !== null && $data['max'] !== null) {
+        for ($i = $data['min']; $i <= $data['max']; $i++) {
+            if (!in_array($i, $data['numbers'])) {
+                $month_gaps[] = $i;
+            }
+        }
+    }
+
+    $row_class = count($month_gaps) > 0 ? 'style="background: #fff3cd;"' : '';
+
+    print '<tr '.$row_class.'>';
+    print '<td><strong>'.$month_name.'</strong></td>';
+    print '<td class="center">'.$data['count'].'</td>';
+    print '<td class="center">'.$data['min'].' - '.$data['max'].'</td>';
+    print '<td class="center">';
+    if (count($month_gaps) > 0) {
+        print '<span style="color: #856404;">'.count($month_gaps).' trou(s)</span>';
+    } else {
+        print '<span style="color: #28a745;">✓ Continue</span>';
+    }
+    print '</td>';
+    print '</tr>';
+}
+
+print '</tbody>';
+print '</table>';
 print '</div>';
 
 // Afficher les détails
