@@ -16,6 +16,7 @@ if (!$user->admin) {
 
 $year = GETPOST('year', 'int') ? GETPOST('year', 'int') : date('Y');
 $show_all = GETPOST('show_all', 'alpha') == 'yes';
+$debug = GETPOST('debug', 'int') == 1;
 
 llxHeader('', 'Vérification Continuité Factures', '');
 
@@ -145,6 +146,14 @@ print '</div>';
 print '<div>';
 print '<input type="submit" value="Filtrer" class="button" style="padding: 8px 20px;">';
 print '</div>';
+
+print '<div style="margin-left: auto;">';
+print '<label style="display: flex; align-items: center; gap: 5px;">';
+print '<input type="checkbox" name="debug" value="1"'.($debug ? ' checked' : '').'>';
+print '<span style="font-size: 12px;">Mode debug</span>';
+print '</label>';
+print '</div>';
+
 print '</form>';
 print '</div>';
 
@@ -157,28 +166,70 @@ print '<span><span class="color-box" style="background: #e3f2fd;"></span>Facture
 print '<span><span class="color-box" style="background: white;"></span>Facture normale</span>';
 print '</div>';
 
+// Première requête : compter toutes les factures de l'année pour détecter le format
+$sql_detect = "SELECT
+    COUNT(*) as total,
+    f.ref as sample_ref
+FROM ".MAIN_DB_PREFIX."facture as f
+WHERE YEAR(f.datef) = ".(int)$year."
+LIMIT 1";
+
+$resql_detect = $db->query($sql_detect);
+$total_year_invoices = 0;
+$sample_ref = '';
+
+if ($resql_detect) {
+    $obj = $db->fetch_object($resql_detect);
+    if ($obj) {
+        $total_year_invoices = $obj->total;
+        $sample_ref = $obj->sample_ref;
+    }
+    $db->free($resql_detect);
+}
+
+if ($debug) {
+    print '<div class="continuity-section" style="background: #e3f2fd;">';
+    print '<h3>🔍 Mode Debug</h3>';
+    print '<p><strong>Total factures '.$year.' :</strong> '.$total_year_invoices.'</p>';
+    print '<p><strong>Exemple de référence :</strong> '.$sample_ref.'</p>';
+}
+
 // Requête pour récupérer toutes les factures de l'année
-// On extrait le numéro de la facture depuis la référence (format: FA2024-0001, FA2024-0002, etc.)
+// Format flexible : détecte automatiquement le séparateur et la position du numéro
 $sql = "SELECT
     f.rowid,
     f.ref,
     f.datef as date_facture,
     f.total_ttc,
     f.fk_statut as status,
-    s.nom as client_name,
-    SUBSTRING(f.ref, LOCATE('-', f.ref) + 1) as numero
+    s.nom as client_name
 FROM ".MAIN_DB_PREFIX."facture as f
 LEFT JOIN ".MAIN_DB_PREFIX."societe as s ON s.rowid = f.fk_soc
 WHERE YEAR(f.datef) = ".(int)$year."
-AND f.ref LIKE 'FA".(int)$year."-%'
-ORDER BY CAST(SUBSTRING(f.ref, LOCATE('-', f.ref) + 1) AS UNSIGNED) ASC";
+AND (f.ref LIKE 'FA".(int)$year."-%'
+     OR f.ref LIKE 'FA".(int)$year."%'
+     OR f.ref LIKE '%".(int)$year."-%'
+     OR f.ref LIKE '%".(int)$year."%')
+ORDER BY f.datef ASC, f.ref ASC";
+
+if ($debug) {
+    print '<p><strong>Requête SQL :</strong></p>';
+    print '<pre style="background: white; padding: 10px; overflow-x: auto;">'.htmlspecialchars($sql).'</pre>';
+}
 
 $resql = $db->query($sql);
 
 if (!$resql) {
     print '<div class="error">Erreur lors de la récupération des factures : '.$db->lasterror().'</div>';
+    if ($debug) {
+        print '</div>';
+    }
     llxFooter();
     exit;
+}
+
+if ($debug) {
+    print '<p><strong>Nombre de résultats :</strong> '.$db->num_rows($resql).'</p>';
 }
 
 $invoices = array();
@@ -188,9 +239,26 @@ $deleted_count = 0;
 $draft_count = 0;
 $validated_count = 0;
 
-// Récupérer toutes les factures
+// Récupérer toutes les factures et extraire le numéro
 while ($obj = $db->fetch_object($resql)) {
-    $num = (int)$obj->numero;
+    // Extraire le numéro de la référence
+    // Formats possibles: FA2024-0001, FA20240001, 2024-0001, etc.
+    $ref = $obj->ref;
+    $num = 0;
+
+    // Méthode 1: chercher après le tiret
+    if (strpos($ref, '-') !== false) {
+        $parts = explode('-', $ref);
+        $num = (int)end($parts);
+    }
+    // Méthode 2: extraire les derniers chiffres
+    else if (preg_match('/(\d+)$/', $ref, $matches)) {
+        $num = (int)$matches[1];
+    }
+
+    if ($debug && $num == 0) {
+        print '<p style="color: red;"><strong>Impossible d\'extraire le numéro de :</strong> '.$ref.'</p>';
+    }
 
     if ($num > 0) {
         if ($min_num === null || $num < $min_num) {
@@ -200,14 +268,17 @@ while ($obj = $db->fetch_object($resql)) {
             $max_num = $num;
         }
 
-        $invoices[$num] = array(
-            'rowid' => $obj->rowid,
-            'ref' => $obj->ref,
-            'date' => $obj->date_facture,
-            'total_ttc' => $obj->total_ttc,
-            'status' => $obj->status,
-            'client' => $obj->client_name
-        );
+        // Si le numéro existe déjà, garder celui avec le statut le plus élevé
+        if (!isset($invoices[$num]) || $obj->status > $invoices[$num]['status']) {
+            $invoices[$num] = array(
+                'rowid' => $obj->rowid,
+                'ref' => $obj->ref,
+                'date' => $obj->date_facture,
+                'total_ttc' => $obj->total_ttc,
+                'status' => $obj->status,
+                'client' => $obj->client_name
+            );
+        }
 
         // Compter les statuts
         if ($obj->status == 0) {
@@ -216,6 +287,16 @@ while ($obj = $db->fetch_object($resql)) {
             $validated_count++;
         }
     }
+}
+
+if ($debug) {
+    print '<p><strong>Références extraites :</strong></p>';
+    print '<pre style="background: white; padding: 10px; max-height: 200px; overflow-y: auto;">';
+    foreach ($invoices as $num => $inv) {
+        print 'N°'.str_pad($num, 4, '0', STR_PAD_LEFT).' => '.$inv['ref'].' (statut: '.$inv['status'].')<br>';
+    }
+    print '</pre>';
+    print '</div>';
 }
 
 $db->free($resql);
