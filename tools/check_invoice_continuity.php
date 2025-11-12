@@ -195,7 +195,7 @@ if ($debug) {
 }
 
 // Requête pour récupérer toutes les factures de l'année
-// Format flexible : détecte automatiquement le séparateur et la position du numéro
+// Sans filtre sur le format de référence pour capturer tous les formats possibles
 $sql = "SELECT
     f.rowid,
     f.ref,
@@ -206,10 +206,7 @@ $sql = "SELECT
 FROM ".MAIN_DB_PREFIX."facture as f
 LEFT JOIN ".MAIN_DB_PREFIX."societe as s ON s.rowid = f.fk_soc
 WHERE YEAR(f.datef) = ".(int)$year."
-AND (f.ref LIKE 'FA".(int)$year."-%'
-     OR f.ref LIKE 'FA".(int)$year."%'
-     OR f.ref LIKE '%".(int)$year."-%'
-     OR f.ref LIKE '%".(int)$year."%')
+AND f.entity IN (0,".$conf->entity.")
 ORDER BY f.datef ASC, f.ref ASC";
 
 if ($debug) {
@@ -229,7 +226,28 @@ if (!$resql) {
 }
 
 if ($debug) {
-    print '<p><strong>Nombre de résultats :</strong> '.$db->num_rows($resql).'</p>';
+    $num_results = $db->num_rows($resql);
+    print '<p><strong>Nombre de résultats :</strong> '.$num_results.'</p>';
+
+    if ($num_results > 0) {
+        print '<p><strong>Premiers exemples de références :</strong></p>';
+        print '<ul style="background: white; padding: 10px; list-style: none;">';
+
+        // Montrer les 10 premières références
+        $count = 0;
+        $temp_results = array();
+        while ($temp_obj = $db->fetch_object($resql)) {
+            $temp_results[] = $temp_obj;
+            if ($count < 10) {
+                print '<li>'.$temp_obj->ref.' (date: '.dol_print_date($db->jdate($temp_obj->date_facture), 'day').', statut: '.$temp_obj->status.')</li>';
+            }
+            $count++;
+        }
+        print '</ul>';
+
+        // Remettre le pointeur au début
+        $db->data_seek($resql, 0);
+    }
 }
 
 $invoices = array();
