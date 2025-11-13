@@ -90,13 +90,24 @@ class ExportAccount
     public function loadCAData($filter_year = 0)
     {
         $sql_ca = "SELECT
-            COALESCE(SUM(f.total_ht), 0) as ca_total_ht,
+            -- CA réel (basé sur les factures validées, hors prévisionnels)
+            COALESCE(SUM(CASE WHEN f.rowid IS NOT NULL AND (c.type_contrat IS NULL OR c.type_contrat != 'previsionnel') THEN f.total_ht ELSE 0 END), 0) as ca_reel_ht,
+            COALESCE(SUM(CASE WHEN f.rowid IS NOT NULL AND (c.type_contrat IS NULL OR c.type_contrat != 'previsionnel') THEN f.total_ttc ELSE 0 END), 0) as ca_reel_ttc,
+
+            -- CA prévisionnel
+            COALESCE(SUM(CASE WHEN c.type_contrat = 'previsionnel' THEN c.amount_ht ELSE 0 END), 0) as ca_previsionnel_ht,
+
+            -- Totaux combinés
+            COALESCE(SUM(CASE WHEN f.rowid IS NOT NULL AND (c.type_contrat IS NULL OR c.type_contrat != 'previsionnel') THEN f.total_ht ELSE 0 END), 0) + COALESCE(SUM(CASE WHEN c.type_contrat = 'previsionnel' THEN c.amount_ht ELSE 0 END), 0) as ca_total_ht,
             COALESCE(SUM(f.total_ttc), 0) as ca_total_ttc,
+
             COALESCE(SUM(c.collaborator_amount_ht), 0) as collaborator_total_ht,
             COALESCE(SUM(c.studio_amount_ht), 0) as studio_total_ht,
             AVG(c.collaborator_percentage) as avg_percentage,
             COUNT(DISTINCT f.rowid) as nb_factures_clients,
             COUNT(DISTINCT c.rowid) as nb_contrats,
+            COUNT(DISTINCT CASE WHEN c.type_contrat IS NULL OR c.type_contrat != 'previsionnel' THEN c.rowid END) as nb_contrats_reels,
+            COUNT(DISTINCT CASE WHEN c.type_contrat = 'previsionnel' THEN c.rowid END) as nb_contrats_previsionnel,
 
             -- Distinction Studio / Focal (ref MF*)
             COALESCE(SUM(CASE WHEN c.ref LIKE 'MF%' THEN c.amount_ht ELSE 0 END), 0) as ca_focal_ht,
@@ -114,7 +125,7 @@ class ExportAccount
 
             FROM ".MAIN_DB_PREFIX."revenuesharing_contract c
             LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = c.fk_facture AND f.fk_statut IN (1,2)
-            WHERE c.fk_collaborator = ".$this->collaborator_id." AND c.status = 1";
+            WHERE c.fk_collaborator = ".$this->collaborator_id." AND c.status IN (0,1)";
 
         if ($filter_year > 0) {
             $sql_ca .= " AND YEAR(f.datef) = ".(int)$filter_year;
@@ -363,10 +374,22 @@ class ExportAccount
             $pdf->Cell(0, 8, $ca_title, 0, 1);
             $pdf->SetFont('helvetica', '', 10);
             
-            // Chiffre d'affaires global
-            $pdf->Cell(60, 6, 'CA HT:', 0, 0);
-            $pdf->Cell(0, 6, price($this->ca_info->ca_total_ht).' €', 0, 1);
-            
+            // Chiffre d'affaires détaillé
+            if (isset($this->ca_info->ca_reel_ht)) {
+                $pdf->Cell(60, 6, 'CA Reel HT:', 0, 0);
+                $pdf->Cell(0, 6, price($this->ca_info->ca_reel_ht).' EUR ('.$this->ca_info->nb_contrats_reels.' contrat(s))', 0, 1);
+
+                if (isset($this->ca_info->ca_previsionnel_ht) && $this->ca_info->ca_previsionnel_ht > 0) {
+                    $pdf->Cell(60, 6, 'CA Previsionnel HT:', 0, 0);
+                    $pdf->Cell(0, 6, price($this->ca_info->ca_previsionnel_ht).' EUR ('.$this->ca_info->nb_contrats_previsionnel.' contrat(s))', 0, 1);
+                }
+            }
+
+            $pdf->SetFont('helvetica', 'B', 10);
+            $pdf->Cell(60, 6, 'CA Total HT:', 0, 0);
+            $pdf->Cell(0, 6, price($this->ca_info->ca_total_ht).' EUR', 0, 1);
+            $pdf->SetFont('helvetica', '', 10);
+
             $pdf->Cell(60, 6, 'Nombre de factures:', 0, 0);
             $pdf->Cell(0, 6, $this->ca_info->nb_factures_clients, 0, 1);
             
@@ -1265,8 +1288,24 @@ class ExportAccount
         // Section CA si disponible
         if ($this->ca_info && $this->ca_info->ca_total_ht > 0) {
             $html .= '<div class="section-title">CHIFFRE D\'AFFAIRES & RÉPARTITION'.($filter_year > 0 ? ' ('.$filter_year.')' : '').'</div>
-            <table class="summary-table">
-                <tr>
+            <table class="summary-table">';
+
+            // Détail CA Réel / Prévisionnel
+            if (isset($this->ca_info->ca_reel_ht)) {
+                $html .= '<tr>
+                    <td>CA Réel HT:</td>
+                    <td class="value">'.price($this->ca_info->ca_reel_ht).' € ('.$this->ca_info->nb_contrats_reels.' contrat(s))</td>
+                </tr>';
+
+                if (isset($this->ca_info->ca_previsionnel_ht) && $this->ca_info->ca_previsionnel_ht > 0) {
+                    $html .= '<tr>
+                        <td>CA Prévisionnel HT:</td>
+                        <td class="value">'.price($this->ca_info->ca_previsionnel_ht).' € ('.$this->ca_info->nb_contrats_previsionnel.' contrat(s))</td>
+                    </tr>';
+                }
+            }
+
+            $html .= '<tr style="background: #f0f0f0; font-weight: bold;">
                     <td>Chiffre d\'affaires total HT:</td>
                     <td class="value">'.price($this->ca_info->ca_total_ht).' €</td>
                 </tr>
