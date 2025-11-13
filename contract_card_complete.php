@@ -551,7 +551,7 @@ print '<style>
 }
 .section-title {
     font-weight: bold;
-    color: #495057;
+    color: var(--colortextbackhmenu);
     margin-bottom: 10px;
     font-size: 1.1em;
 }
@@ -731,7 +731,7 @@ if ($action == 'create' || $action == 'edit') {
     print '<option value="reel"'.($object->type_contrat == 'reel' || empty($object->type_contrat) ? ' selected' : '').'>Contrat réel (avec facture)</option>';
     print '<option value="previsionnel"'.($object->type_contrat == 'previsionnel' ? ' selected' : '').'> Contrat prévisionnel (estimation)</option>';
     print '</select>';
-    print '<div style="font-size: 0.9em; color: #666; margin-top: 5px;">';
+    print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu); margin-top: 5px;">';
     print '<span id="type_help_reel" style="display: '.($object->type_contrat == 'previsionnel' ? 'none' : 'block').';">Contrat lié à une facture existante</span>';
     print '<span id="type_help_prev" style="display: '.($object->type_contrat == 'previsionnel' ? 'block' : 'none').';">Estimation de projet, transformable en contrat réel plus tard</span>';
     print '</div>';
@@ -775,7 +775,7 @@ if ($action == 'create' || $action == 'edit') {
         $date_prestation_value = date('Y-m-d');
     }
     print '<input type="date" name="date_prestation_prevue" value="'.$date_prestation_value.'" />';
-    print '<div style="font-size: 0.9em; color: #666; margin-top: 3px;">Date estimée de la prestation</div>';
+    print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu); margin-top: 3px;">Date estimée de la prestation</div>';
     print '</td>';
     print '</tr>';
     
@@ -784,7 +784,7 @@ if ($action == 'create' || $action == 'edit') {
     print '<td>';
     $date_facturation_value = isset($object->date_facturation_prevue) ? $object->date_facturation_prevue : '';
     print '<input type="date" name="date_facturation_prevue" value="'.$date_facturation_value.'" />';
-    print '<div style="font-size: 0.9em; color: #666; margin-top: 3px;">Optionnel - Quand facturer ce contrat</div>';
+    print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu); margin-top: 3px;">Optionnel - Quand facturer ce contrat</div>';
     print '</td>';
     print '</tr>';
     
@@ -942,13 +942,13 @@ if ($action == 'create' || $action == 'edit') {
         print '<td>';
         if ($object->status == 0) {
             print '<span style="background: #ffebcc; color: #cc6600; padding: 3px 8px; border-radius: 3px;">Brouillon</span>';
-            print '<br><small style="color: #666; font-style: italic;">Modifiable • Supprimable • Peut être validé</small>';
+            print '<br><small style="color: var(--colortextbackhmenu); font-style: italic;">Modifiable • Supprimable • Peut être validé</small>';
         } else {
             print '<span style="background: #d4edda; color: #155724; padding: 3px 8px; border-radius: 3px;">Validé</span>';
             if ($object->date_valid) {
-                print '<br><small style="color: #666;">le '.dol_print_date(strtotime($object->date_valid), 'dayhour').'</small>';
+                print '<br><small class="opacitymedium">le '.dol_print_date(strtotime($object->date_valid), 'dayhour').'</small>';
             }
-            print '<br><small style="color: #666; font-style: italic;">Modifiable • Peut repasser en brouillon</small>';
+            print '<br><small style="color: var(--colortextbackhmenu); font-style: italic;">Modifiable • Peut repasser en brouillon</small>';
         }
         print '</td>';
         print '</tr>';

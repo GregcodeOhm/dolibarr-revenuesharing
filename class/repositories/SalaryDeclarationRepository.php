@@ -577,24 +577,45 @@ class SalaryDeclarationRepository
             $where .= " AND d.status = ".$filter_status;
         }
 
+        // Requête principale sans JOIN pour éviter la multiplication des montants
         $sql = "SELECT
-            COUNT(DISTINCT d.rowid) as total_declarations,
-            SUM(det.cachet_brut) as total_cachets,
-            SUM(d.masse_salariale) as total_masse,
-            SUM(d.solde_utilise) as total_solde
+            COUNT(d.rowid) as total_declarations,
+            COALESCE(SUM(d.masse_salariale), 0) as total_masse,
+            COALESCE(SUM(d.solde_utilise), 0) as total_solde
+            FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration d
+            ".$where;
+
+        // Deuxième requête pour obtenir le total des cachets
+        $sql_cachets = "SELECT COALESCE(SUM(det.cachet_brut), 0) as total_cachets
             FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration d
             LEFT JOIN ".MAIN_DB_PREFIX."revenuesharing_salary_declaration_detail det ON det.fk_declaration = d.rowid
             ".$where;
 
         $resql = $this->db->query($sql);
 
-        if ($resql) {
-            $obj = $this->db->fetch_object($resql);
-            $this->db->free($resql);
-            return $obj;
+        if (!$resql) {
+            return false;
         }
 
-        return false;
+        $obj = $this->db->fetch_object($resql);
+        $this->db->free($resql);
+
+        if (!$obj) {
+            return false;
+        }
+
+        // Exécuter la deuxième requête pour obtenir le total des cachets
+        $resql_cachets = $this->db->query($sql_cachets);
+
+        if ($resql_cachets) {
+            $obj_cachets = $this->db->fetch_object($resql_cachets);
+            if ($obj_cachets) {
+                $obj->total_cachets = $obj_cachets->total_cachets;
+            }
+            $this->db->free($resql_cachets);
+        }
+
+        return $obj;
     }
 }
 ?>

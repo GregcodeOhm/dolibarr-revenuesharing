@@ -152,20 +152,20 @@ print '</div>';
 
 // Section dates
 print '<div style="background: #f8f9fa; border-radius: 6px; padding: 15px; margin-bottom: 20px;">';
-print '<h4 style="margin: 0 0 15px 0; color: #495057;">Dates du Contrat</h4>';
+print '<h4 style="margin: 0 0 15px 0; color: var(--colortextbackhmenu);">Dates du Contrat</h4>';
 
 print '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">';
 
 print '<div>';
 print '<label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333;">Date de prestation prévue</label>';
 print '<input type="date" name="date_prestation" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" value="'.date('Y-m-d').'">';
-print '<small style="color: #666; display: block; margin-top: 3px;">Date estimée de la prestation</small>';
+print '<small style="color: var(--colortextbackhmenu); display: block; margin-top: 3px;">Date estimée de la prestation</small>';
 print '</div>';
 
 print '<div>';
 print '<label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333;">Date de facturation prévue</label>';
 print '<input type="date" name="date_facturation" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">';
-print '<small style="color: #666; display: block; margin-top: 3px;">Optionnel - Quand facturer ce contrat</small>';
+print '<small style="color: var(--colortextbackhmenu); display: block; margin-top: 3px;">Optionnel - Quand facturer ce contrat</small>';
 print '</div>';
 
 print '</div>';
@@ -222,8 +222,8 @@ print '<label style="display: block; font-weight: bold; margin-bottom: 5px; colo
 print '<input type="number" name="cost_per_session" step="0.01" min="0" value="0" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" id="cost_per_session" onchange="calculateAmounts()">';
 print '</div>';
 
-print '<div style="background: #f8d7da; padding: 10px; border-radius: 4px;">';
-print '<label style="display: block; font-weight: bold; margin-bottom: 5px; color: #721c24;">Net collaborateur</label>';
+print '<div style="background: var(--colorbacktabcard1); padding: 10px; border-radius: 4px;">';
+print '<label style="display: block; font-weight: bold; margin-bottom: 5px; color: var(--colortext);">Net collaborateur</label>';
 print '<div id="net_amount" style="font-size: 1.2em; font-weight: bold;">0,00 €</div>';
 print '</div>';
 

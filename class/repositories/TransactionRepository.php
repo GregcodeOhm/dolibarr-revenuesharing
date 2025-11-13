@@ -65,7 +65,12 @@ class TransactionRepository
 
         // Filtre type de transaction
         if (!empty($filters['type'])) {
-            $whereClause .= " AND t.transaction_type = '".$this->db->escape($filters['type'])."'";
+            // Si on filtre sur 'salary', on ne comptera que les salaires
+            if ($filters['type'] === 'salary') {
+                $whereClause .= " AND 1=0"; // Aucune transaction classique ne match
+            } else {
+                $whereClause .= " AND t.transaction_type = '".$this->db->escape($filters['type'])."'";
+            }
         }
 
         // Filtre prévisionnels
@@ -73,7 +78,7 @@ class TransactionRepository
             $whereClause .= " AND (c.type_contrat IS NULL OR c.type_contrat != 'previsionnel')";
         }
 
-        // Compter le total
+        // Compter le total des transactions classiques
         $sql_count = "SELECT COUNT(*) as total
                       FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
                       LEFT JOIN ".MAIN_DB_PREFIX."revenuesharing_contract c ON c.rowid = t.fk_contract
@@ -89,8 +94,43 @@ class TransactionRepository
             $this->db->free($resql_count);
         }
 
-        // Récupérer les transactions avec pagination
-        $sql = "SELECT t.*,
+        // Compter les salaires payés
+        $sql_salary_count = "SELECT COUNT(*) as total
+                            FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration
+                            WHERE fk_collaborator = ".(int)$collaboratorId." AND status = 3";
+
+        if (!empty($filters['year'])) {
+            $sql_salary_count .= " AND declaration_year = ".(int)$filters['year'];
+        }
+
+        // Si on filtre sur un type autre que 'salary', ne pas compter les salaires
+        if (!empty($filters['type']) && $filters['type'] !== 'salary') {
+            $sql_salary_count .= " AND 1=0";
+        }
+
+        $resql_salary_count = $this->db->query($sql_salary_count);
+        if ($resql_salary_count) {
+            $obj_salary_count = $this->db->fetch_object($resql_salary_count);
+            $total += (int)$obj_salary_count->total;
+            $this->db->free($resql_salary_count);
+        }
+
+        // Récupérer les transactions avec pagination en utilisant UNION
+        $sql = "SELECT * FROM (
+            SELECT
+                t.rowid,
+                t.fk_collaborator,
+                t.transaction_type,
+                t.amount,
+                t.description,
+                t.transaction_date,
+                t.date_creation,
+                t.status,
+                t.fk_contract,
+                t.fk_facture,
+                t.fk_facture_fourn,
+                t.fk_user_creat,
+                t.note_private,
                 c.label as contract_label,
                 c.ref as contract_ref,
                 c.status as contract_status,
@@ -101,15 +141,75 @@ class TransactionRepository
                 ff.datef as facture_fourn_date,
                 ff.libelle as facture_fourn_label,
                 u.login as user_login,
-                COALESCE(f.datef, ff.datef, t.transaction_date) as display_date
-                FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
-                LEFT JOIN ".MAIN_DB_PREFIX."revenuesharing_contract c ON c.rowid = t.fk_contract
-                LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
-                LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
-                LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = t.fk_user_creat
-                ".$whereClause."
-                ORDER BY COALESCE(f.datef, ff.datef, t.transaction_date) DESC, t.date_creation DESC
-                LIMIT ".$limit." OFFSET ".$offset;
+                COALESCE(f.datef, ff.datef, t.transaction_date) as display_date,
+                NULL as salary_declaration_id,
+                NULL as declaration_year,
+                NULL as declaration_month,
+                NULL as total_days
+            FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
+            LEFT JOIN ".MAIN_DB_PREFIX."revenuesharing_contract c ON c.rowid = t.fk_contract
+            LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = t.fk_facture
+            LEFT JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = t.fk_facture_fourn
+            LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = t.fk_user_creat
+            ".$whereClause."
+
+            UNION ALL
+
+            SELECT
+                -sd.rowid as rowid,
+                sd.fk_collaborator,
+                'salary' as transaction_type,
+                -sd.solde_utilise as amount,
+                CONCAT('Salaire ',
+                    CASE sd.declaration_month
+                        WHEN 1 THEN 'Janvier'
+                        WHEN 2 THEN 'Février'
+                        WHEN 3 THEN 'Mars'
+                        WHEN 4 THEN 'Avril'
+                        WHEN 5 THEN 'Mai'
+                        WHEN 6 THEN 'Juin'
+                        WHEN 7 THEN 'Juillet'
+                        WHEN 8 THEN 'Août'
+                        WHEN 9 THEN 'Septembre'
+                        WHEN 10 THEN 'Octobre'
+                        WHEN 11 THEN 'Novembre'
+                        WHEN 12 THEN 'Décembre'
+                    END,
+                    ' ', sd.declaration_year,
+                    ' (', sd.total_days, ' jours)'
+                ) as description,
+                DATE(sd.date_modification) as transaction_date,
+                sd.date_creation,
+                sd.status,
+                NULL as fk_contract,
+                NULL as fk_facture,
+                NULL as fk_facture_fourn,
+                sd.fk_user_creat,
+                sd.note_private,
+                NULL as contract_label,
+                NULL as contract_ref,
+                NULL as contract_status,
+                NULL as contract_type_contrat,
+                NULL as facture_ref,
+                NULL as facture_date,
+                NULL as facture_fourn_ref,
+                NULL as facture_fourn_date,
+                NULL as facture_fourn_label,
+                u.login as user_login,
+                DATE(sd.date_modification) as display_date,
+                sd.rowid as salary_declaration_id,
+                sd.declaration_year,
+                sd.declaration_month,
+                sd.total_days
+            FROM ".MAIN_DB_PREFIX."revenuesharing_salary_declaration sd
+            LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = sd.fk_user_creat
+            WHERE sd.fk_collaborator = ".(int)$collaboratorId."
+            AND sd.status = 3"
+            .(!empty($filters['year']) ? " AND sd.declaration_year = ".(int)$filters['year'] : "")
+            .(!empty($filters['type']) && $filters['type'] !== 'salary' ? " AND 1=0" : "")."
+        ) AS combined_transactions
+        ORDER BY display_date DESC, date_creation DESC
+        LIMIT ".$limit." OFFSET ".$offset;
 
         $resql = $this->db->query($sql);
         if (!$resql) {

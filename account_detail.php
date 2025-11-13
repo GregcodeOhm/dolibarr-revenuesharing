@@ -34,7 +34,8 @@ if (!$user->admin) {
 $id = GETPOST('id', 'int');
 $action = GETPOST('action', 'alpha');
 $filter_type = GETPOST('filter_type', 'alpha');
-$filter_year = GETPOST('filter_year', 'int');
+// Défaut à l'année en cours si le paramètre n'est pas présent, sinon utiliser la valeur (même 0)
+$filter_year = isset($_GET['filter_year']) ? GETPOST('filter_year', 'int') : date('Y');
 $collaborator_filter = GETPOST('collaborator_filter', 'int') ? GETPOST('collaborator_filter', 'int') : $id;
 $show_previsionnel = GETPOST('show_previsionnel', 'alpha') === 'yes';
 $page = GETPOST('page', 'int') ? GETPOST('page', 'int') : 1;
@@ -111,7 +112,7 @@ try {
         throw new Exception('Erreur lors de la récupération des déclarations de salaires');
     }
 } catch (Exception $e) {
-    print '<div style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24; padding: 15px; margin: 20px 0; border-radius: 4px;">';
+    print '<div style="background: var(--colorbacktabcard1); border: 1px solid #dc3545; color: var(--colortext); padding: 15px; margin: 20px 0; border-radius: 4px;">';
     print '<strong>⚠️ Erreur:</strong> '.htmlspecialchars($e->getMessage());
     print '</div>';
     llxFooter();
@@ -129,15 +130,15 @@ print '<div style="display: flex; justify-content: space-between; align-items: s
 print '<div>';
 print '<h3 style="margin: 0 0 10px 0; color: #007cba;"> '.dol_escape_htmltag($collaborator->label).'</h3>';
 if ($collaborator->firstname && $collaborator->lastname) {
-    print '<p style="margin: 5px 0; color: #666;"><strong>Nom complet :</strong> '.$collaborator->firstname.' '.$collaborator->lastname.'</p>';
+    print '<p style="margin: 5px 0; color: var(--colortextbackhmenu);"><strong>Nom complet :</strong> '.$collaborator->firstname.' '.$collaborator->lastname.'</p>';
 }
 if ($collaborator->email) {
-    print '<p style="margin: 5px 0; color: #666;"><strong>Email :</strong> '.$collaborator->email.'</p>';
+    print '<p style="margin: 5px 0; color: var(--colortextbackhmenu);"><strong>Email :</strong> '.$collaborator->email.'</p>';
 }
 if ($collaborator->default_percentage) {
-    print '<p style="margin: 5px 0; color: #666;"><strong>% défaut :</strong> '.$collaborator->default_percentage.'%</p>';
+    print '<p style="margin: 5px 0; color: var(--colortextbackhmenu);"><strong>% défaut :</strong> '.$collaborator->default_percentage.'%</p>';
 }
-print '<p style="margin: 5px 0; color: #666;"><strong>Statut :</strong> '.($collaborator->active ? 'Actif' : 'Inactif').'</p>';
+print '<p style="margin: 5px 0; color: var(--colortextbackhmenu);"><strong>Statut :</strong> '.($collaborator->active ? 'Actif' : 'Inactif').'</p>';
 print '</div>';
 
 // Afficher le chiffre d'affaires et la répartition du collaborateur
@@ -166,14 +167,14 @@ if ($ca_info->ca_total_ht > 0 || $ca_info->ca_previsionnel_ht > 0) {
     
     print '<div style="background: #e8f5e8; padding: 12px; border-radius: 4px; border-left: 4px solid #28a745;">';
     print '<div style="font-size: 1.2em; font-weight: bold; color: #155724;">'.price($ca_info->ca_reel_ht).'</div>';
-    print '<div style="font-size: 0.9em; color: #666; margin-bottom: 3px;">CA Réel HT</div>';
+    print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu); margin-bottom: 3px;">CA Réel HT</div>';
     print '<div style="font-size: 0.8em; color: #155724;">'.$ca_info->nb_contrats_reels.' contrat(s) • '.$ca_info->nb_factures_clients.' facture(s)</div>';
     print '</div>';
     
     if ($show_previsionnel && $ca_info->ca_previsionnel_ht > 0) {
         print '<div style="background: #e3f2fd; padding: 12px; border-radius: 4px; border-left: 4px solid #007cba;">';
         print '<div style="font-size: 1.2em; font-weight: bold; color: #007cba;">'.price($ca_info->ca_previsionnel_ht).'</div>';
-        print '<div style="font-size: 0.9em; color: #666; margin-bottom: 3px;">CA Prévisionnel HT</div>';
+        print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu); margin-bottom: 3px;">CA Prévisionnel HT</div>';
         print '<div style="font-size: 0.8em; color: #007cba;">'.$ca_info->nb_contrats_previsionnel.' contrat(s) • estimations</div>';
         print '</div>';
     } else {
@@ -188,7 +189,7 @@ if ($ca_info->ca_total_ht > 0 || $ca_info->ca_previsionnel_ht > 0) {
     
     print '<div style="background: #fff3e0; padding: 12px; border-radius: 4px; border-left: 4px solid #f57c00;">';
     print '<div style="font-size: 1.3em; font-weight: bold; color: #f57c00;">'.price($ca_info->ca_total_ht).'</div>';
-    print '<div style="font-size: 0.9em; color: #666; margin-bottom: 3px;">CA Total HT</div>';
+    print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu); margin-bottom: 3px;">CA Total HT</div>';
     print '<div style="font-size: 0.8em; color: #f57c00;">';
     if ($show_previsionnel && $ca_info->ca_previsionnel_ht > 0) {
         print 'Réel + Prévisionnel';
@@ -208,20 +209,20 @@ if ($ca_info->ca_total_ht > 0 || $ca_info->ca_previsionnel_ht > 0) {
         
         // Ligne 1 : Parts collaborateur détaillées
         print '<div style="margin-bottom: 15px;">';
-        print '<h6 style="margin: 0 0 8px 0; color: #666; font-size: 0.9em;"> PARTS COLLABORATEUR</h6>';
+        print '<h6 style="margin: 0 0 8px 0; color: var(--colortextbackhmenu); font-size: 0.9em;"> PARTS COLLABORATEUR</h6>';
         print '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; text-align: center;">';
         
         // Part réelle
         print '<div style="background: #e8f5e8; padding: 10px; border-radius: 4px; border-left: 3px solid #28a745;">';
         print '<div style="font-size: 1.1em; font-weight: bold; color: #155724;">'.price($ca_info->collaborator_reel_ht).'</div>';
-        print '<div style="font-size: 0.8em; color: #666;">Réel</div>';
+        print '<div style="font-size: 0.8em; color: var(--colortextbackhmenu);">Réel</div>';
         print '</div>';
         
         // Part prévisionnelle
         if ($show_previsionnel && $ca_info->collaborator_previsionnel_ht > 0) {
             print '<div style="background: #e3f2fd; padding: 10px; border-radius: 4px; border-left: 3px solid #007cba;">';
             print '<div style="font-size: 1.1em; font-weight: bold; color: #007cba;">'.price($ca_info->collaborator_previsionnel_ht).'</div>';
-            print '<div style="font-size: 0.8em; color: #666;">Prévisionnel</div>';
+            print '<div style="font-size: 0.8em; color: var(--colortextbackhmenu);">Prévisionnel</div>';
             print '</div>';
         } else {
             print '<div style="background: #f8f9fa; padding: 10px; border-radius: 4px; color: #6c757d;">';
@@ -235,7 +236,7 @@ if ($ca_info->ca_total_ht > 0 || $ca_info->ca_previsionnel_ht > 0) {
         $collab_percent = $total_repartition > 0 ? ($ca_info->collaborator_total_ht / $total_repartition * 100) : 0;
         print '<div style="background: #e3f2fd; padding: 10px; border-radius: 4px; border: 2px solid #007cba;">';
         print '<div style="font-size: 1.2em; font-weight: bold; color: #007cba;">'.price($ca_info->collaborator_total_ht).'</div>';
-        print '<div style="font-size: 0.8em; color: #666;">Total ('.number_format($collab_percent, 1).'%)</div>';
+        print '<div style="font-size: 0.8em; color: var(--colortextbackhmenu);">Total ('.number_format($collab_percent, 1).'%)</div>';
         print '</div>';
         
         print '</div>';
@@ -243,20 +244,20 @@ if ($ca_info->ca_total_ht > 0 || $ca_info->ca_previsionnel_ht > 0) {
         
         // Ligne 2 : Parts structure détaillées
         print '<div style="margin-bottom: 15px;">';
-        print '<h6 style="margin: 0 0 8px 0; color: #666; font-size: 0.9em;"> PARTS STRUCTURE</h6>';
+        print '<h6 style="margin: 0 0 8px 0; color: var(--colortextbackhmenu); font-size: 0.9em;"> PARTS STRUCTURE</h6>';
         print '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; text-align: center;">';
         
         // Part structure réelle
         print '<div style="background: #fff3e0; padding: 10px; border-radius: 4px; border-left: 3px solid #f57c00;">';
         print '<div style="font-size: 1.1em; font-weight: bold; color: #f57c00;">'.price($ca_info->studio_reel_ht).'</div>';
-        print '<div style="font-size: 0.8em; color: #666;">Réel</div>';
+        print '<div style="font-size: 0.8em; color: var(--colortextbackhmenu);">Réel</div>';
         print '</div>';
         
         // Part structure prévisionnelle
         if ($show_previsionnel && $ca_info->studio_previsionnel_ht > 0) {
             print '<div style="background: #e0f2f1; padding: 10px; border-radius: 4px; border-left: 3px solid #00695c;">';
             print '<div style="font-size: 1.1em; font-weight: bold; color: #00695c;">'.price($ca_info->studio_previsionnel_ht).'</div>';
-            print '<div style="font-size: 0.8em; color: #666;">Prévisionnel</div>';
+            print '<div style="font-size: 0.8em; color: var(--colortextbackhmenu);">Prévisionnel</div>';
             print '</div>';
         } else {
             print '<div style="background: #f8f9fa; padding: 10px; border-radius: 4px; color: #6c757d;">';
@@ -269,7 +270,7 @@ if ($ca_info->ca_total_ht > 0 || $ca_info->ca_previsionnel_ht > 0) {
         $studio_percent = $total_repartition > 0 ? ($ca_info->studio_total_ht / $total_repartition * 100) : 0;
         print '<div style="background: #fff3e0; padding: 10px; border-radius: 4px; border: 2px solid #f57c00;">';
         print '<div style="font-size: 1.2em; font-weight: bold; color: #f57c00;">'.price($ca_info->studio_total_ht).'</div>';
-        print '<div style="font-size: 0.8em; color: #666;">Total ('.number_format($studio_percent, 1).'%)</div>';
+        print '<div style="font-size: 0.8em; color: var(--colortextbackhmenu);">Total ('.number_format($studio_percent, 1).'%)</div>';
         print '</div>';
         
         print '</div>';
@@ -284,9 +285,76 @@ if ($ca_info->ca_total_ht > 0 || $ca_info->ca_previsionnel_ht > 0) {
         
         print '</div>';
     }
-    
+
+    // Section Détail Studio / Focal
+    if (isset($ca_info->ca_studio_ht) && isset($ca_info->ca_focal_ht) && ($ca_info->ca_studio_ht > 0 || $ca_info->ca_focal_ht > 0)) {
+        print '<div style="background: white; border-radius: 6px; padding: 12px; margin-top: 15px;">';
+        print '<h5 style="margin: 0 0 15px 0; color: #6c85bd;">📊 Détail Prestations Studio / Ventes Focal</h5>';
+
+        print '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">';
+
+        // Bloc Prestations Studio
+        print '<div style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); padding: 15px; border-radius: 6px; border-left: 4px solid #28a745;">';
+        print '<h6 style="margin: 0 0 10px 0; color: #155724; display: flex; align-items: center; gap: 5px;"><span>🎬</span> Prestations Studio</h6>';
+
+        print '<div style="background: rgba(255,255,255,0.8); padding: 8px; border-radius: 4px; margin-bottom: 8px;">';
+        print '<div style="font-size: 0.8em; color: #666; margin-bottom: 3px;">CA Total</div>';
+        print '<div style="font-size: 1.2em; font-weight: bold; color: #155724;">'.price($ca_info->ca_studio_ht).'</div>';
+        print '</div>';
+
+        print '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">';
+        print '<div style="background: rgba(255,255,255,0.8); padding: 6px; border-radius: 4px;">';
+        print '<div style="font-size: 0.7em; color: #666;">Collaborateur</div>';
+        print '<div style="font-size: 1em; font-weight: bold; color: #007cba;">'.price($ca_info->collaborator_studio_ht).'</div>';
+        print '</div>';
+        print '<div style="background: rgba(255,255,255,0.8); padding: 6px; border-radius: 4px;">';
+        print '<div style="font-size: 0.7em; color: #666;">Studio</div>';
+        print '<div style="font-size: 1em; font-weight: bold; color: #f57c00;">'.price($ca_info->studio_studio_ht).'</div>';
+        print '</div>';
+        print '</div>';
+
+        if ($ca_info->nb_contrats_studio > 0) {
+            print '<div style="margin-top: 8px; font-size: 0.8em; color: #155724; text-align: center;">';
+            print $ca_info->nb_contrats_studio.' contrat(s)';
+            print '</div>';
+        }
+
+        print '</div>';
+
+        // Bloc Ventes Focal
+        print '<div style="background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%); padding: 15px; border-radius: 6px; border-left: 4px solid #6c85bd;">';
+        print '<h6 style="margin: 0 0 10px 0; color: #3f51b5; display: flex; align-items: center; gap: 5px;"><span>🎯</span> Ventes Focal</h6>';
+
+        print '<div style="background: rgba(255,255,255,0.8); padding: 8px; border-radius: 4px; margin-bottom: 8px;">';
+        print '<div style="font-size: 0.8em; color: #666; margin-bottom: 3px;">Marge Total</div>';
+        print '<div style="font-size: 1.2em; font-weight: bold; color: #3f51b5;">'.price($ca_info->ca_focal_ht).'</div>';
+        print '</div>';
+
+        print '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">';
+        print '<div style="background: rgba(255,255,255,0.8); padding: 6px; border-radius: 4px;">';
+        print '<div style="font-size: 0.7em; color: #666;">Collaborateur</div>';
+        print '<div style="font-size: 1em; font-weight: bold; color: #007cba;">'.price($ca_info->collaborator_focal_ht).'</div>';
+        print '</div>';
+        print '<div style="background: rgba(255,255,255,0.8); padding: 6px; border-radius: 4px;">';
+        print '<div style="font-size: 0.7em; color: #666;">Ohmnibus</div>';
+        print '<div style="font-size: 1em; font-weight: bold; color: #f57c00;">'.price($ca_info->studio_focal_ht).'</div>';
+        print '</div>';
+        print '</div>';
+
+        if ($ca_info->nb_contrats_focal > 0) {
+            print '<div style="margin-top: 8px; font-size: 0.8em; color: #3f51b5; text-align: center;">';
+            print $ca_info->nb_contrats_focal.' contrat(s) MF';
+            print '</div>';
+        }
+
+        print '</div>';
+
+        print '</div>';
+        print '</div>';
+    }
+
     // Info complémentaire
-    print '<div style="text-align: center; margin-top: 15px; font-size: 0.9em; color: #666; background: #f8f9fa; padding: 10px; border-radius: 4px;">';
+    print '<div style="text-align: center; margin-top: 15px; font-size: 0.9em; color: var(--colortextbackhmenu); background: #f8f9fa; padding: 10px; border-radius: 4px;">';
     print '<span style="margin-right: 15px;">'.$ca_info->nb_contrats_total.' contrat(s) total</span>';
     if ($ca_info->nb_contrats_reels > 0) {
         print '<span style="margin-right: 15px;">'.$ca_info->nb_contrats_reels.' réel(s)</span>';
@@ -302,7 +370,7 @@ if ($ca_info->ca_total_ht > 0 || $ca_info->ca_previsionnel_ht > 0) {
     print '</div>';
     
 } else {
-    print '<div style="text-align: center; padding: 20px; color: #666; font-style: italic;">';
+    print '<div style="text-align: center; padding: 20px; color: var(--colortextbackhmenu); font-style: italic;">';
     print '<div style="font-size: 2em; margin-bottom: 10px;"></div>';
     print '<div>Aucune facture client associée';
     if ($filter_year > 0) {
@@ -341,8 +409,8 @@ if ($salaires_info->nb_brouillons > 0 || $salaires_info->nb_valides > 0 || $sala
         print '<div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 15px; text-align: center;">';
         print '<div style="font-size: 1.5em; margin-bottom: 5px;"></div>';
         print '<div style="font-size: 1.2em; font-weight: bold; color: #856404;">'.$salaires_info->nb_brouillons.'</div>';
-        print '<div style="font-size: 0.9em; color: #666;">Brouillon(s)</div>';
-        print '<div style="font-size: 0.8em; color: #666; margin-top: 5px;">'.$salaires_info->jours_brouillons.' jour(s)</div>';
+        print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu);">Brouillon(s)</div>';
+        print '<div style="font-size: 0.8em; color: var(--colortextbackhmenu); margin-top: 5px;">'.$salaires_info->jours_brouillons.' jour(s)</div>';
         print '</div>';
     }
     
@@ -351,8 +419,8 @@ if ($salaires_info->nb_brouillons > 0 || $salaires_info->nb_valides > 0 || $sala
         print '<div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 15px; text-align: center;">';
         print '<div style="font-size: 1.5em; margin-bottom: 5px;"></div>';
         print '<div style="font-size: 1.2em; font-weight: bold; color: #155724;">'.$salaires_info->nb_valides.'</div>';
-        print '<div style="font-size: 0.9em; color: #666;">Validée(s)</div>';
-        print '<div style="font-size: 0.8em; color: #666; margin-top: 5px;">'.$salaires_info->jours_valides.' jour(s)</div>';
+        print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu);">Validée(s)</div>';
+        print '<div style="font-size: 0.8em; color: var(--colortextbackhmenu); margin-top: 5px;">'.$salaires_info->jours_valides.' jour(s)</div>';
         print '</div>';
     }
     
@@ -361,8 +429,8 @@ if ($salaires_info->nb_brouillons > 0 || $salaires_info->nb_valides > 0 || $sala
         print '<div style="background: #cce5f0; border: 1px solid #9fc5e8; border-radius: 8px; padding: 15px; text-align: center;">';
         print '<div style="font-size: 1.5em; margin-bottom: 5px;"></div>';
         print '<div style="font-size: 1.2em; font-weight: bold; color: #007cba;">'.$salaires_info->nb_payes.'</div>';
-        print '<div style="font-size: 0.9em; color: #666;">Payée(s)</div>';
-        print '<div style="font-size: 0.8em; color: #666; margin-top: 5px;">'.$salaires_info->jours_payes.' jour(s)</div>';
+        print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu);">Payée(s)</div>';
+        print '<div style="font-size: 0.8em; color: var(--colortextbackhmenu); margin-top: 5px;">'.$salaires_info->jours_payes.' jour(s)</div>';
         print '</div>';
     }
     
@@ -370,26 +438,26 @@ if ($salaires_info->nb_brouillons > 0 || $salaires_info->nb_valides > 0 || $sala
     
     // Section prévisionnel si il y a des brouillons ou validées
     if ($salaires_info->montant_previsionnel > 0) {
-        print '<div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 15px; margin: 15px 0;">';
-        print '<h4 style="margin: 0 0 10px 0; color: #721c24;">Impact Prévisionnel</h4>';
+        print '<div style="background: var(--colorbacktabcard1); border: 1px solid #f5c6cb; border-radius: 8px; padding: 15px; margin: 15px 0;">';
+        print '<h4 style="margin: 0 0 10px 0; color: var(--colortext);">Impact Prévisionnel</h4>';
         print '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">';
         
         print '<div style="text-align: center;">';
         print '<div style="font-size: 1.1em; color: #dc3545;">- '.price($salaires_info->montant_previsionnel).'</div>';
-        print '<div style="font-size: 0.9em; color: #666;">Solde à déduire</div>';
+        print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu);">Solde à déduire</div>';
         print '</div>';
         
         $solde_previsionnel = $cumulative_balance - $salaires_info->montant_previsionnel;
         $color_previsionnel = $solde_previsionnel >= 0 ? '#28a745' : '#dc3545';
         print '<div style="text-align: center;">';
         print '<div style="font-size: 1.3em; font-weight: bold; color: '.$color_previsionnel.';">'.price($solde_previsionnel).'</div>';
-        print '<div style="font-size: 0.9em; color: #666;">Solde prévisionnel</div>';
+        print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu);">Solde prévisionnel</div>';
         print '</div>';
         
         print '</div>';
         
         if ($salaires_info->nb_brouillons > 0) {
-            print '<div style="font-size: 0.8em; color: #666; margin-top: 10px; text-align: center;">';
+            print '<div style="font-size: 0.8em; color: var(--colortextbackhmenu); margin-top: 10px; text-align: center;">';
             print 'Inclut '.$salaires_info->nb_brouillons.' brouillon(s) non validé(s)';
             print '</div>';
         }
@@ -403,7 +471,7 @@ if ($salaires_info->nb_brouillons > 0 || $salaires_info->nb_valides > 0 || $sala
     print '</div>';
     
 } else {
-    print '<div style="text-align: center; padding: 20px; color: #666;">';
+    print '<div style="text-align: center; padding: 20px; color: var(--colortextbackhmenu);">';
     print '<div style="font-size: 2em; margin-bottom: 10px;"></div>';
     print '<div>Aucune déclaration de salaire';
     if ($filter_year > 0) {
@@ -432,33 +500,33 @@ print '<div style="margin-top: 10px; font-size: 0.9em;">';
 
 if ($filter_year > 0) {
     // Affichage détaillé pour une année filtrée - solde reporté d'abord
-    print '<span style="color: #666;">Solde reporté: '.price($previous_balance).'</span><br>';
+    print '<span class="opacitymedium">Solde reporté: '.price($previous_balance).'</span><br>';
     print '<span style="color: green;">Crédits '.$filter_year.': '.price($balance_info->year_credits).'</span><br>';
     print '<span style="color: red;">Débits '.$filter_year.': '.price($balance_info->year_debits).'</span><br>';
-    print '<span style="color: #666;">'.$balance_info->nb_transactions.' transaction(s) en '.$filter_year.'</span><br>';
+    print '<span class="opacitymedium">'.$balance_info->nb_transactions.' transaction(s) en '.$filter_year.'</span><br>';
 } else {
     // Affichage global
     print '<span style="color: green;">Crédits: '.price($balance_info->year_credits).'</span><br>';
     print '<span style="color: red;">Débits: '.price($balance_info->year_debits).'</span><br>';
-    print '<span style="color: #666;">'.$balance_info->nb_transactions.' transaction(s)</span><br>';
+    print '<span class="opacitymedium">'.$balance_info->nb_transactions.' transaction(s)</span><br>';
 }
 
 // Solde cumulé en dernier, mis en évidence
 print '<div style="font-size: 2em; font-weight: bold; color: '.$balance_color.'; margin-top: 10px;">'.price($cumulative_balance).'</div>';
 if ($filter_year > 0) {
-    print '<div style="color: #666; font-size: 0.9em;">Solde cumulé au '.$filter_year.'</div>';
+    print '<div style="color: var(--colortextbackhmenu); font-size: 0.9em;">Solde cumulé au '.$filter_year.'</div>';
 } else {
-    print '<div style="color: #666; font-size: 0.9em;">Solde actuel</div>';
+    print '<div style="color: var(--colortextbackhmenu); font-size: 0.9em;">Solde actuel</div>';
 }
 
 // Indication sur l'inclusion/exclusion des prévisionnels dans le solde
 if ($show_previsionnel) {
     print '<div style="color: #007cba; font-size: 0.8em; margin-top: 5px; font-style: italic;"> Inclut les contrats prévisionnels</div>';
 } else {
-    print '<div style="color: #666; font-size: 0.8em; margin-top: 5px; font-style: italic;">Contrats réels uniquement</div>';
+    print '<div style="color: var(--colortextbackhmenu); font-size: 0.8em; margin-top: 5px; font-style: italic;">Contrats réels uniquement</div>';
 }
 if ($balance_info->last_transaction_date) {
-    print '<br><span style="color: #666;">'.dol_print_date($db->jdate($balance_info->last_transaction_date), 'day').'</span>';
+    print '<br><span class="opacitymedium">'.dol_print_date($db->jdate($balance_info->last_transaction_date), 'day').'</span>';
 }
 print '</div>';
 print '</div>';
@@ -487,7 +555,7 @@ if (count($statistics) > 0) {
         print '<div style="background: '.$color.'; padding: 15px; border-radius: 8px; text-align: center;">';
         print '<div style="font-weight: bold; color: '.$text_color.';">'.$type_labels[$stat->transaction_type].'</div>';
         print '<div style="font-size: 1.2em; font-weight: bold; color: '.$text_color.';">'.price($stat->total_amount).'</div>';
-        print '<div style="font-size: 0.9em; color: #666;">'.$stat->nb_operations.' opération(s)</div>';
+        print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu);">'.$stat->nb_operations.' opération(s)</div>';
         print '</div>';
     }
 
@@ -523,7 +591,7 @@ print '</div>';
 // Section Export
 print '<div style="background: #f0f8ff; border: 1px solid #b8d4f0; border-radius: 8px; padding: 15px; margin: 20px 0;">';
 print '<h4 style="margin: 0 0 10px 0; color: #1e6ba8;">Export du relevé de compte</h4>';
-print '<p style="margin: 5px 0; color: #666;">Exportez le relevé de compte avec les filtres actuellement appliqués</p>';
+print '<p style="margin: 5px 0; color: var(--colortextbackhmenu);">Exportez le relevé de compte avec les filtres actuellement appliqués</p>';
 
 // Formulaire d'export
 print '<form method="GET" action="export_account.php" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px;">';
@@ -543,9 +611,10 @@ print '<input type="hidden" name="show_previsionnel" value="'.($show_previsionne
 
 print '<button type="submit" name="format" value="pdf" class="butAction" style="background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">'.img_picto('', 'pdf', 'class="pictofixedwidth"').' Export PDF</button>';
 print '<button type="submit" name="format" value="excel" class="butAction" style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">'.img_picto('', 'object_xls', 'class="pictofixedwidth"').' Export Excel</button>';
+print '<button type="button" onclick="showEmailModal()" class="butAction" style="background: #007cba; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">'.img_picto('', 'email', 'class="pictofixedwidth"').' Envoyer par email</button>';
 
 if ($filter_type || $filter_year) {
-    print '<small style="color: #666; font-style: italic;">Avec filtres: ';
+    print '<small style="color: var(--colortextbackhmenu); font-style: italic;">Avec filtres: ';
     if ($filter_type) print 'Type='.$filter_type.' ';
     if ($filter_year) print 'Année='.$filter_year;
     print '</small>';
@@ -606,7 +675,7 @@ $type_labels_js = array(
                 <div style="margin-bottom: 15px;">
                     <label for="edit_amount" style="display: block; font-weight: bold; margin-bottom: 5px;">Montant (€):</label>
                     <input type="number" name="amount" id="edit_amount" step="0.01" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" required>
-                    <small style="color: #666; display: block; margin-top: 5px;" id="amount_help">Si vous venez de supprimer une liaison facture, vous pouvez fermer cette fenêtre sans modifier le montant.</small>
+                    <small style="color: var(--colortextbackhmenu); display: block; margin-top: 5px;" id="amount_help">Si vous venez de supprimer une liaison facture, vous pouvez fermer cette fenêtre sans modifier le montant.</small>
                 </div>
                 
                 <div style="margin-bottom: 15px;">
@@ -617,7 +686,7 @@ $type_labels_js = array(
                 <!-- Section Libellé (contrat/facture liée) -->
                 <div style="margin-bottom: 15px;">
                     <label style="display: block; font-weight: bold; margin-bottom: 5px;">Réf. client (contrat/facture liée):</label>
-                    <div id="edit_label_display" style="background: #f8f9fa; padding: 8px; border: 1px solid #e9ecef; border-radius: 4px; min-height: 20px; color: #666; font-style: italic; position: relative;">
+                    <div id="edit_label_display" style="background: #f8f9fa; padding: 8px; border: 1px solid #e9ecef; border-radius: 4px; min-height: 20px; color: var(--colortextbackhmenu); font-style: italic; position: relative;">
                         Aucune réf. client (transaction non liée)
                     </div>
                     <div id="edit_label_actions" style="margin-top: 5px; display: none;">
@@ -790,14 +859,14 @@ $type_labels_js = array(
                         <div style="margin-bottom: 15px;">
                             <label style="display: block; font-weight: bold; margin-bottom: 5px;">Facture liée:</label>
                             <div id="contract_facture_info" style="padding: 8px; border: 1px solid #e9ecef; border-radius: 4px; background: white; min-height: 20px;">
-                                <span style="color: #666; font-style: italic;">Aucune facture liée</span>
+                                <span style="color: var(--colortextbackhmenu); font-style: italic;">Aucune facture liée</span>
                             </div>
                         </div>
                         
                         <div style="margin-bottom: 15px;">
                             <label style="display: block; font-weight: bold; margin-bottom: 5px;">Devis lié:</label>
                             <div id="contract_propal_info" style="padding: 8px; border: 1px solid #e9ecef; border-radius: 4px; background: white; min-height: 20px;">
-                                <span style="color: #666; font-style: italic;">Aucun devis lié</span>
+                                <span style="color: var(--colortextbackhmenu); font-style: italic;">Aucun devis lié</span>
                             </div>
                         </div>
                     </div>
@@ -833,8 +902,94 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!-- Modal d'envoi par email -->
+<div id="emailModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div style="background-color: white; margin: 5% auto; border-radius: 8px; width: 90%; max-width: 600px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
+        <div style="padding: 20px; border-bottom: 1px solid #ddd;">
+            <h3 style="margin: 0; color: #007cba;">Envoyer le relevé de compte par email</h3>
+        </div>
+
+        <form method="POST" action="export_account.php" style="padding: 20px;">
+            <input type="hidden" name="action" value="send_email">
+            <input type="hidden" name="id" value="<?php echo $id; ?>">
+            <input type="hidden" name="format" value="pdf">
+            <input type="hidden" name="token" value="<?php echo newToken(); ?>">
+            <?php if ($filter_type): ?>
+            <input type="hidden" name="filter_type" value="<?php echo $filter_type; ?>">
+            <?php endif; ?>
+            <?php if ($filter_year): ?>
+            <input type="hidden" name="filter_year" value="<?php echo $filter_year; ?>">
+            <?php endif; ?>
+            <input type="hidden" name="show_previsionnel" value="<?php echo $show_previsionnel ? '1' : '0'; ?>">
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Format du relevé:</label>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="radio" name="email_format" value="pdf" checked style="margin-right: 5px;">
+                        <span>PDF uniquement (pièce jointe)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="radio" name="email_format" value="html" style="margin-right: 5px;">
+                        <span>HTML uniquement (dans le corps du message)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="radio" name="email_format" value="both" style="margin-right: 5px;">
+                        <span>PDF + HTML (pièce jointe + corps du message)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Adresse email du destinataire:</label>
+                <input type="email" name="email_to" id="email_to" value="<?php echo dol_escape_htmltag($collaborator->email); ?>" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" required>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Objet de l'email:</label>
+                <input type="text" name="email_subject" id="email_subject" value="Votre relevé de compte<?php echo $filter_year ? ' - '.$filter_year : ''; ?>" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" required>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Message:</label>
+                <textarea name="email_message" id="email_message" rows="6" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">Bonjour <?php echo dol_escape_htmltag($collaborator->label); ?>,
+
+Veuillez trouver ci-joint votre relevé de compte<?php echo $filter_year ? ' pour l\'année '.$filter_year : ''; ?>.
+
+Cordialement,
+<?php echo $conf->global->MAIN_INFO_SOCIETE_NOM; ?></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: space-between;">
+                <button type="button" onclick="closeEmailModal()" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">Annuler</button>
+                <button type="submit" style="background: #007cba; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;"><?php print img_picto('', 'email'); ?> Envoyer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showEmailModal() {
+    document.getElementById('emailModal').style.display = 'block';
+}
+
+function closeEmailModal() {
+    document.getElementById('emailModal').style.display = 'none';
+}
+
+// Fermer le modal si on clique en dehors
+window.onclick = function(event) {
+    var modal = document.getElementById('emailModal');
+    if (event.target == modal) {
+        closeEmailModal();
+    }
+}
+</script>
+
 <!-- JavaScript externe -->
 <script src="js/account_detail.js"></script>
 
+<?php
+llxFooter();
 $db->close();
 ?>

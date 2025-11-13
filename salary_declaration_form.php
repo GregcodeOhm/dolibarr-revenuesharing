@@ -306,10 +306,10 @@ llxHeader('', $is_edit_mode ? 'Modifier Déclaration' : 'Nouvelle Déclaration',
 
 // Confirmation de suppression en haut
 if ($action == 'delete') {
-    print '<div class="center" style="margin: 20px 0; padding: 20px; background: #f8d7da; border: 2px solid #f5c6cb; border-radius: 8px;">';
-    print '<div style="font-size: 1.5em; color: #721c24; margin-bottom: 15px;"><strong>Confirmation de suppression</strong></div>';
+    print '<div class="center" style="margin: 20px 0; padding: 20px; background: var(--colorbacktabcard1); border: 2px solid #f5c6cb; border-radius: 8px;">';
+    print '<div style="font-size: 1.5em; color: var(--colortext); margin-bottom: 15px;"><strong>Confirmation de suppression</strong></div>';
     print '<div style="font-size: 1.1em; margin-bottom: 10px;">Êtes-vous sûr de vouloir supprimer cette déclaration de salaire ?</div>';
-    print '<div style="font-size: 1.0em; color: #721c24; margin-bottom: 15px;"><strong>Cette action est irréversible !</strong></div>';
+    print '<div style="font-size: 1.0em; color: var(--colortext); margin-bottom: 15px;"><strong>Cette action est irréversible !</strong></div>';
     print '<div style="display: flex; gap: 15px; justify-content: center;">';
     print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$id.'&action=delete&confirm=yes" class="button" style="background: #dc3545; color: white; padding: 10px 20px; font-size: 1.1em; border-radius: 5px;">Confirmer la suppression</a>';
     print '<a href="'.$_SERVER['PHP_SELF'].'?id='.$id.'" class="button" style="background: #6c757d; color: white; padding: 10px 20px; font-size: 1.1em; border-radius: 5px;">Annuler</a>';
@@ -398,19 +398,19 @@ print '<h3 style="margin: 0 0 15px 0; color: #007cba;">Paramètres Financiers</h
 print '<div style="margin-bottom: 15px;">';
 print '<label for="cachet_brut_unitaire" style="display: block; font-weight: bold; margin-bottom: 5px;">Cachet brut unitaire (€) * :</label>';
 print '<input type="number" name="cachet_brut_unitaire" id="cachet_brut_unitaire" step="0.01" min="0" class="minwidth150" value="'.($declaration ? $declaration->cachet_brut_unitaire : '').'" required>';
-print '<div style="font-size: 0.9em; color: #666; margin-top: 3px;">Rémunération journalière brute par cachet</div>';
+print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu); margin-top: 3px;">Rémunération journalière brute par cachet</div>';
 print '</div>';
 
 print '<div style="margin-bottom: 15px;">';
 print '<label for="masse_salariale" style="display: block; font-weight: bold; margin-bottom: 5px;">Masse salariale employeur (€) :</label>';
 print '<input type="number" name="masse_salariale" id="masse_salariale" step="0.01" min="0" class="minwidth150" value="'.($declaration ? $declaration->masse_salariale : '').'">';
-print '<div style="font-size: 0.9em; color: #666; margin-top: 3px;">Coût total employeur (salaire + charges) - Calculé automatiquement</div>';
+print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu); margin-top: 3px;">Coût total employeur (salaire + charges) - Calculé automatiquement</div>';
 print '</div>';
 
 print '<div style="margin-bottom: 15px;">';
 print '<label for="solde_utilise" style="display: block; font-weight: bold; margin-bottom: 5px;">Solde utilisé (€) :</label>';
 print '<input type="number" name="solde_utilise" id="solde_utilise" step="0.01" min="0" class="minwidth150" value="'.($declaration ? $declaration->solde_utilise : '').'">';
-print '<div style="font-size: 0.9em; color: #666; margin-top: 3px;">Montant prélevé du compte collaborateur = Masse salariale (calculé automatiquement)</div>';
+print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu); margin-top: 3px;">Montant prélevé du compte collaborateur = Masse salariale (calculé automatiquement)</div>';
 print '</div>';
 
 print '</div>';
@@ -433,7 +433,7 @@ foreach ($metiers_son as $key => $label) {
     print '<option value="'.$key.'">'.$label.'</option>';
 }
 print '</select>';
-print '<div style="font-size: 0.9em; color: #666; margin-top: 3px;">Ce métier sera appliqué automatiquement aux nouveaux jours sélectionnés</div>';
+print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu); margin-top: 3px;">Ce métier sera appliqué automatiquement aux nouveaux jours sélectionnés</div>';
 print '</div>';
 
 // Sélecteur d'heures par défaut
@@ -453,11 +453,11 @@ foreach ($durees_courantes as $heures => $description) {
     print '<option value="'.$heures.'"'.$selected.'>'.$description.'</option>';
 }
 print '</select>';
-print '<div style="font-size: 0.9em; color: #666; margin-top: 3px;">Ces heures seront appliquées automatiquement aux nouveaux jours sélectionnés</div>';
+print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu); margin-top: 3px;">Ces heures seront appliquées automatiquement aux nouveaux jours sélectionnés</div>';
 print '</div>';
 
 print '<div id="calendar-container" style="margin: 15px 0; min-height: 300px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: white;">';
-print '<div style="text-align: center; color: #666; padding: 20px;">Chargement du calendrier...</div>';
+print '<div style="text-align: center; color: var(--colortextbackhmenu); padding: 20px;">Chargement du calendrier...</div>';
 print '</div>';
 
 print '<div style="margin-top: 15px; background: #fff3cd; padding: 10px; border-radius: 4px;">';
@@ -480,7 +480,7 @@ print '</div>';
 // Section détail des métiers et heures par jour
 print '<div style="background: #f0f8ff; padding: 15px; border-radius: 8px; margin-top: 15px;" id="metiersDetails" style="display: none;">';
 print '<h4 style="margin: 0 0 10px 0; color: #4a5568;">Métiers et Heures par jour sélectionné</h4>';
-print '<div style="font-size: 0.9em; color: #666; margin-bottom: 10px;">Personnalisez le métier et les heures pour chaque jour de travail</div>';
+print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu); margin-bottom: 10px;">Personnalisez le métier et les heures pour chaque jour de travail</div>';
 print '<div id="metiersContainer">';
 print '<!-- Les sélecteurs de métiers et heures apparaîtront ici -->';
 print '</div>';
@@ -550,7 +550,7 @@ print '</form>';
 }
 .calendar-day.disabled {
     background: #f5f5f5;
-    color: #ccc;
+    color: var(--colortextbackhmenu);
     cursor: not-allowed;
     opacity: 0.5;
 }
@@ -643,7 +643,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const color = solde >= 0 ? '#28a745' : '#dc3545';
                     soldeDisplay.innerHTML = `<strong style="color: ${color};">${data.solde_formatted}</strong>`;
                 } else {
-                    soldeDisplay.innerHTML = '<em style="color: #666;">Solde non disponible</em>';
+                    soldeDisplay.innerHTML = '<em class="opacitymedium">Solde non disponible</em>';
                 }
             })
             .catch(error => {

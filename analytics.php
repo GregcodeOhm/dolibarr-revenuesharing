@@ -179,7 +179,7 @@ try {
         'intervenant' => $filter_intervenant
     ]);
 } catch (Exception $e) {
-    print '<div style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24; padding: 15px; margin: 20px 0; border-radius: 4px;">';
+    print '<div style="background: var(--colorbacktabcard1); border: 1px solid #dc3545; color: var(--colortext); padding: 15px; margin: 20px 0; border-radius: 4px;">';
     print '<strong>⚠️ Erreur KPIs:</strong> '.htmlspecialchars($e->getMessage());
     print '</div>';
     $kpi_data = new stdClass();
@@ -234,7 +234,7 @@ try {
         $total_ca_secteurs += $secteur->ca_ht;
     }
 } catch (Exception $e) {
-    print '<div style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24; padding: 10px; margin: 10px 0; border-radius: 4px;">';
+    print '<div style="background: var(--colorbacktabcard1); border: 1px solid #dc3545; color: var(--colortext); padding: 10px; margin: 10px 0; border-radius: 4px;">';
     print '<strong>⚠️ Erreur secteurs:</strong> '.htmlspecialchars($e->getMessage());
     print '</div>';
     $secteurs_data = [];
@@ -293,7 +293,7 @@ try {
         'analytique' => $filter_analytique
     ]);
 } catch (Exception $e) {
-    print '<div style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24; padding: 10px; margin: 10px 0; border-radius: 4px;">';
+    print '<div style="background: var(--colorbacktabcard1); border: 1px solid #dc3545; color: var(--colortext); padding: 10px; margin: 10px 0; border-radius: 4px;">';
     print '<strong>⚠️ Erreur intervenants:</strong> '.htmlspecialchars($e->getMessage());
     print '</div>';
     $intervenants_data = [];
@@ -512,7 +512,7 @@ if (!$filter_analytique && !$filter_intervenant) {
                 print '<td><strong>'.$secteur_label.'</strong></td>';
                 $current_secteur = $obj->analytique;
             } else {
-                print '<td style="color: #ccc; font-style: italic;">↳ suite</td>';
+                print '<td style="color: var(--colortextbackhmenu); font-style: italic;">↳ suite</td>';
             }
 
             print '<td>'.dol_escape_htmltag($obj->intervenant).'</td>';

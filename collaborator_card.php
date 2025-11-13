@@ -423,9 +423,9 @@ else {
         print '<td>Statut</td>';
         print '<td>';
         if ($object->active) {
-            print '<span class="badge badge-status4 badge-status">Actif</span>';
+            print '<span class="badge badge-success badge-status">Actif</span>';
         } else {
-            print '<span class="badge badge-status8 badge-status">Inactif</span>';
+            print '<span class="badge badge-danger badge-status">Inactif</span>';
         }
         print '</td>';
         print '</tr>';
@@ -529,9 +529,9 @@ else {
                     print '<td class="center">'.price($obj_contract->net_collaborator_amount).'</td>';
                     print '<td class="center">';
                     if ($obj_contract->status == 0) {
-                        print '<span class="badge badge-status1 badge-status">Brouillon</span>';
+                        print '<span class="badge badge-info badge-status">Brouillon</span>';
                     } else {
-                        print '<span class="badge badge-status4 badge-status">Validé</span>';
+                        print '<span class="badge badge-success badge-status">Validé</span>';
                     }
                     print '</td>';
                     print '<td class="center">'.dol_print_date($db->jdate($obj_contract->date_creation), 'day').'</td>';

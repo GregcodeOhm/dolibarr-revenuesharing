@@ -22,6 +22,11 @@ $balanceRepo = new BalanceRepository($db, $cache);
 $filter_collaborator = GETPOST('filter_collaborator', 'int');
 $filter_year = GETPOST('filter_year', 'int');
 
+// Si aucune année n'est spécifiée, utiliser l'année en cours par défaut
+if (!$filter_year && !isset($_GET['filter_year'])) {
+    $filter_year = (int)date('Y');
+}
+
 llxHeader('', 'Comptes Collaborateurs', '');
 
 print load_fiche_titre('Comptes Collaborateurs', '', 'generic');
@@ -31,7 +36,7 @@ $sql_check = "SHOW TABLES LIKE '".MAIN_DB_PREFIX."revenuesharing_account_balance
 $resql_check = $db->query($sql_check);
 
 if (!$resql_check || $db->num_rows($resql_check) == 0) {
-    print '<div style="background: #f8d7da; padding: 20px; border-radius: 5px; color: #721c24; text-align: center;">';
+    print '<div style="background: var(--colorbacktabcard1); padding: 20px; border-radius: 5px; color: var(--colortext); text-align: center;">';
     print '<h3>Tables non créées</h3>';
     print '<p>Le système de comptes collaborateurs n\'est pas encore initialisé.</p>';
     print '<p>Contactez votre administrateur pour initialiser le système.</p>';
@@ -41,36 +46,13 @@ if (!$resql_check || $db->num_rows($resql_check) == 0) {
     exit;
 }
 
-// Recalcul des soldes depuis les transactions
-try {
-    $sql_recalc = "UPDATE ".MAIN_DB_PREFIX."revenuesharing_account_balance ab
-    SET
-        total_credits = COALESCE((
-            SELECT SUM(amount)
-            FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
-            WHERE t.fk_collaborator = ab.fk_collaborator
-            AND t.amount > 0 AND t.status = 1
-        ), 0),
-        total_debits = COALESCE((
-            SELECT ABS(SUM(amount))
-            FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
-            WHERE t.fk_collaborator = ab.fk_collaborator
-            AND t.amount < 0 AND t.status = 1
-        ), 0),
-        current_balance = COALESCE((
-            SELECT SUM(amount)
-            FROM ".MAIN_DB_PREFIX."revenuesharing_account_transaction t
-            WHERE t.fk_collaborator = ab.fk_collaborator AND t.status = 1
-        ), 0)";
-
-    $db->query($sql_recalc);
-} catch (Exception $e) {
-    // Erreur silencieuse, non bloquante
-}
+// Note: Les soldes sont maintenant calculés par le BalanceRepository
+// qui prend en compte les transactions ET les salaires déclarés (status=3)
+// Le recalcul automatique a été supprimé pour éviter les incohérences
 
 // Formulaire de filtrage
 print '<div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin: 20px 0;">';
-print '<h4 style="margin: 0 0 10px 0; color: #495057;">Filtres</h4>';
+print '<h4 style="margin: 0 0 10px 0; color: var(--colortextbackhmenu);">Filtres</h4>';
 print '<form method="GET" action="'.$_SERVER["PHP_SELF"].'" style="display: flex; gap: 15px; align-items: end;">';
 
 // Filtre par année
@@ -153,12 +135,12 @@ try {
             print '</tr>';
             
             print '<tr class="oddeven">';
-            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold; color: #007cba;">'.$stats->nb_collaborators.'</div></td>';
-            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold; color: #28a745;">'.price($stats->total_all_credits).'</div></td>';
-            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold; color: #dc3545;">'.price($stats->total_all_debits).'</div></td>';
-            
-            $balance_color = ($stats->total_balance >= 0) ? '#28a745' : '#dc3545';
-            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold; color: '.$balance_color.';">'.price($stats->total_balance).'</div></td>';
+            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold;">'.$stats->nb_collaborators.'</div></td>';
+            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold;" class="badge badge-success">'.price($stats->total_all_credits).'</div></td>';
+            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold;" class="badge badge-danger">'.price($stats->total_all_debits).'</div></td>';
+
+            $badge_class = ($stats->total_balance >= 0) ? 'badge-success' : 'badge-danger';
+            print '<td class="center"><div style="font-size: 1.5em; font-weight: bold;" class="badge '.$badge_class.'">'.price($stats->total_balance).'</div></td>';
             print '</tr>';
             
             print '</table>';
@@ -175,14 +157,17 @@ try {
     print '<tr class="liste_titre">';
     print '<th>Collaborateur</th>';
     if ($filter_year > 0) {
+        print '<th class="center">Crédits '.($filter_year - 1).'</th>';
+        print '<th class="center">Solde '.($filter_year - 1).'</th>';
         print '<th class="center">Crédits '.$filter_year.'</th>';
         print '<th class="center">Débits '.$filter_year.'</th>';
-        print '<th class="center"> Solde '.$filter_year.'</th>';
+        print '<th class="center">Solde '.$filter_year.'</th>';
+        print '<th class="center">Solde Total</th>';
         print '<th class="center">Transactions '.$filter_year.'</th>';
     } else {
         print '<th class="center">Total Crédits</th>';
         print '<th class="center">Total Débits</th>';
-        print '<th class="center"> Solde Actuel</th>';
+        print '<th class="center">Solde Actuel</th>';
         print '<th class="center">Transactions</th>';
     }
     print '<th class="center">Dernière Op.</th>';
@@ -199,69 +184,91 @@ try {
         print '<td>';
         print '<strong>'.$obj->label.'</strong>';
         if ($obj->firstname && $obj->lastname) {
-            print '<br><small style="color: #666;">'.$obj->firstname.' '.$obj->lastname.'</small>';
+            print '<br><small class="opacitymedium">'.$obj->firstname.' '.$obj->lastname.'</small>';
         }
         print '</td>';
-        
+
+        // Si filtre année actif, afficher d'abord les données N-1
+        if ($filter_year > 0) {
+            // Crédits N-1
+            print '<td class="center">';
+            if ($obj->prev_year_credits > 0) {
+                print '<span class="badge badge-success" style="padding: 3px 6px; opacity: 0.7;">'.price($obj->prev_year_credits).'</span>';
+            } else {
+                print '<span class="opacitymedium">0,00 €</span>';
+            }
+            print '</td>';
+
+            // Solde N-1
+            print '<td class="center">';
+            $prev_balance_badge = ($obj->prev_year_balance >= 0) ? 'badge-success' : 'badge-danger';
+            print '<span class="badge '.$prev_balance_badge.'" style="padding: 4px 8px; font-size: 0.95em; opacity: 0.7;">';
+            print price($obj->prev_year_balance);
+            print '</span>';
+            print '</td>';
+        }
+
         // Crédits (avec filtre année)
         print '<td class="center">';
         $credits_value = ($filter_year > 0) ? $obj->year_credits : $obj->total_credits;
         if ($credits_value > 0) {
-            print '<span style="color: #28a745; background: #d4edda; padding: 3px 6px; border-radius: 6px; font-weight: bold; font-size: 0.9em;">'.price($credits_value).'</span>';
+            print '<span class="badge badge-success" style="padding: 3px 6px;">'.price($credits_value).'</span>';
         } else {
-            print '<span style="color: #ccc;">0,00 €</span>';
+            print '<span class="opacitymedium">0,00 €</span>';
         }
         print '</td>';
-        
+
         // Débits (avec filtre année)
         print '<td class="center">';
         $debits_value = ($filter_year > 0) ? $obj->year_debits : $obj->total_debits;
         if ($debits_value > 0) {
-            print '<span style="color: #dc3545; background: #f8d7da; padding: 3px 6px; border-radius: 6px; font-weight: bold; font-size: 0.9em;">'.price($debits_value).'</span>';
+            print '<span class="badge badge-danger" style="padding: 3px 6px;">'.price($debits_value).'</span>';
         } else {
-            print '<span style="color: #ccc;">0,00 €</span>';
+            print '<span class="opacitymedium">0,00 €</span>';
         }
         print '</td>';
-        
-        // Solde (avec filtre année)  
+
+        // Solde (avec filtre année)
         print '<td class="center">';
         $balance_value = ($filter_year > 0) ? $obj->year_balance : $obj->current_balance;
-        if ($balance_value >= 0) {
-            $balance_color = '#28a745';
-            $balance_bg = '#d4edda';
-            $balance_icon = '';
-        } else {
-            $balance_color = '#dc3545';
-            $balance_bg = '#f8d7da';
-            $balance_icon = '';
-        }
-        print '<span style="color: '.$balance_color.'; background: '.$balance_bg.'; padding: 4px 8px; border-radius: 8px; font-weight: bold; font-size: 1em;">';
-        print $balance_icon.' '.price($balance_value);
+        $badge_class = ($balance_value >= 0) ? 'badge-success' : 'badge-danger';
+        print '<span class="badge '.$badge_class.'" style="padding: 4px 8px; font-size: 1em;">';
+        print price($balance_value);
         print '</span>';
         print '</td>';
-        
+
+        // Solde Total (uniquement si filtre année actif)
+        if ($filter_year > 0) {
+            print '<td class="center">';
+            $total_balance_badge = ($obj->current_balance >= 0) ? 'badge-success' : 'badge-danger';
+            print '<span class="badge '.$total_balance_badge.'" style="padding: 4px 8px; font-size: 1em;">';
+            print price($obj->current_balance);
+            print '</span>';
+            print '</td>';
+        }
+
         // Nb transactions (avec filtre année)
         print '<td class="center">';
         if ($obj->nb_transactions > 0) {
-            print '<span class="badge" style="background: #007cba; color: white; padding: 2px 6px; border-radius: 3px;">'.$obj->nb_transactions.'</span>';
+            print '<span class="badge badge-info">'.$obj->nb_transactions.'</span>';
         } else {
-            print '<span style="color: #ccc;">0</span>';
+            print '<span class="opacitymedium">0</span>';
         }
         print '</td>';
-        
+
         // Dernière opération
         print '<td class="center">';
         if ($obj->last_transaction_date) {
             print dol_print_date($db->jdate($obj->last_transaction_date), 'day');
         } else {
-            print '<span style="color: #ccc;">-</span>';
+            print '<span class="opacitymedium">-</span>';
         }
         print '</td>';
-        
+
         // Actions
         print '<td class="center">';
         print '<a href="account_detail.php?id='.$obj->rowid.'" class="button" style="margin: 2px;"> Voir</a>';
-        print '<a href="account_transaction.php?collaborator_id='.$obj->rowid.'" class="button" style="margin: 2px; background: #fd7e14; color: white;"> Opération</a>';
+        print '<a href="account_transaction.php?collaborator_id='.$obj->rowid.'" class="butActionDelete" style="margin: 2px;"> Opération</a>';
         print '</td>';
         
         print '</tr>';
@@ -269,7 +276,7 @@ try {
     }
     
     if ($num == 0) {
-        print '<tr><td colspan="7" class="center" style="padding: 20px; color: #666;">';
+        print '<tr><td colspan="7" class="center" style="padding: 20px; color: var(--colortextbackhmenu);">';
         print '<div style="font-size: 3em;"></div>';
         print '<h3>Aucun collaborateur trouvé</h3>';
         print '</td></tr>';
@@ -279,7 +286,7 @@ try {
     print '</div>';
 
 } catch (Exception $e) {
-    print '<div style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24; padding: 15px; margin: 20px 0; border-radius: 4px;">';
+    print '<div style="background: var(--colorbacktabcard1); border: 1px solid #dc3545; color: var(--colortext); padding: 15px; margin: 20px 0; border-radius: 4px;">';
     print '<strong>⚠️ Erreur:</strong> '.htmlspecialchars($e->getMessage());
     print '</div>';
     llxFooter();
@@ -290,7 +297,7 @@ try {
 // Section Export Global
 print '<div style="background: #f0f8ff; border: 1px solid #b8d4f0; border-radius: 8px; padding: 15px; margin: 20px 0;">';
 print '<h4 style="margin: 0 0 10px 0; color: #1e6ba8;">Export global des comptes</h4>';
-print '<p style="margin: 5px 0; color: #666;">Exportez la liste complète des comptes collaborateurs avec leurs soldes</p>';
+print '<p style="margin: 5px 0; color: var(--colortextbackhmenu);">Exportez la liste complète des comptes collaborateurs avec leurs soldes</p>';
 
 print '<form method="GET" action="export_all_accounts.php" style="margin-top: 10px;">';
 print '<input type="hidden" name="action" value="export">';
@@ -303,7 +310,7 @@ print '<button type="submit" name="format" value="csv" class="butAction" style="
 print '<button type="submit" name="format" value="pdf" class="butAction" style="background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;"> Export PDF</button>';
 print '</div>';
 if ($filter_year > 0) {
-    print '<p style="margin: 5px 0; color: #666; font-size: 0.9em;"><em>Export filtré pour l\'année '.$filter_year.'</em></p>';
+    print '<p style="margin: 5px 0; color: var(--colortextbackhmenu); font-size: 0.9em;"><em>Export filtré pour l\'année '.$filter_year.'</em></p>';
 }
 print '</form>';
 print '</div>';

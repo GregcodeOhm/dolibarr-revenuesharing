@@ -300,7 +300,7 @@ if ($resql) {
             if (isset($obj->type_contrat) && $obj->type_contrat == 'previsionnel') {
                 print '<br><small style="color: #007cba; font-style: italic;">🔮 Contrat prévisionnel</small>';
             } elseif ($obj->project_ref || $obj->facture_ref) {
-                print '<br><small style="color: #666;">';
+                print '<br><small style="color: var(--colortextbackhmenu);">';
                 if ($obj->project_ref) {
                     print '📁 '.$obj->project_ref.' ';
                 }
@@ -337,11 +337,11 @@ if ($resql) {
             // Statut
             print '<td class="center">';
             if ($obj->status == 0) {
-                print '<span class="badge badge-status1 badge-status">📝 Brouillon</span>';
+                print '<span class="badge badge-info badge-status">📝 Brouillon</span>';
             } elseif ($obj->status == 1) {
-                print '<span class="badge badge-status4 badge-status">✅ Validé</span>';
+                print '<span class="badge badge-success badge-status">✅ Validé</span>';
             } else {
-                print '<span class="badge badge-status8 badge-status">❓ Inconnu</span>';
+                print '<span class="badge badge-danger badge-status">❓ Inconnu</span>';
             }
             print '</td>';
 
@@ -498,7 +498,7 @@ if ($resql) {
     print '</div>';
 
 } else {
-    print '<div style="color: red; padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px;">';
+    print '<div style="color: red; padding: 15px; background: var(--colorbacktabcard1); border: 1px solid #f5c6cb; border-radius: 5px;">';
     print '<h3>❌ Erreur de base de données</h3>';
     print '<p>Erreur : '.$db->lasterror().'</p>';
     print '</div>';

@@ -1,0 +1,164 @@
+/**
+ * CSS pour le module Revenue Sharing
+ * Support automatique du mode sombre Dolibarr
+ */
+
+/* Détection du mode sombre via la class body */
+/* Dolibarr ajoute une classe sur le body quand le thème sombre est activé */
+
+/* Variables de couleurs adaptatives */
+:root {
+    --rs-color-success: #28a745;
+    --rs-color-danger: #dc3545;
+    --rs-color-warning: #ffc107;
+    --rs-color-info: #007cba;
+    --rs-bg-success: #d4edda;
+    --rs-bg-danger: #f8d7da;
+    --rs-bg-warning: #fff3cd;
+    --rs-bg-info: #e3f2fd;
+}
+
+/* Mode sombre : adapter les couleurs */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --rs-color-success: #4caf50;
+        --rs-color-danger: #f44336;
+        --rs-color-warning: #ff9800;
+        --rs-color-info: #2196f3;
+        --rs-bg-success: rgba(76, 175, 80, 0.2);
+        --rs-bg-danger: rgba(244, 67, 54, 0.2);
+        --rs-bg-warning: rgba(255, 152, 0, 0.2);
+        --rs-bg-info: rgba(33, 150, 243, 0.2);
+    }
+}
+
+/* Badges personnalisés pour crédits (vert) */
+.badge-credit,
+.badge-success {
+    background-color: var(--rs-color-success) !important;
+    color: white !important;
+}
+
+/* Badges personnalisés pour débits (rouge) */
+.badge-debit,
+.badge-danger {
+    background-color: var(--rs-color-danger) !important;
+    color: white !important;
+}
+
+/* Badge info (bleu) */
+.badge-info {
+    background-color: var(--rs-color-info) !important;
+    color: white !important;
+}
+
+/* Badge warning (orange) */
+.badge-warning {
+    background-color: var(--rs-color-warning) !important;
+    color: #000 !important;
+}
+
+/* Section info */
+.info-box {
+    background-color: var(--rs-bg-info);
+    border: 1px solid var(--rs-color-info);
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 4px;
+}
+
+/* Section succès */
+.success-box {
+    background-color: var(--rs-bg-success);
+    border: 1px solid var(--rs-color-success);
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 4px;
+}
+
+/* Section erreur */
+.error-box {
+    background-color: var(--rs-bg-danger);
+    border: 1px solid var(--rs-color-danger);
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 4px;
+}
+
+/* Section avertissement */
+.warning-box {
+    background-color: var(--rs-bg-warning);
+    border: 1px solid var(--rs-color-warning);
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 4px;
+}
+
+/* Forcer l'adaptation des textes colorés en mode sombre */
+@media (prefers-color-scheme: dark) {
+    /* Textes verts (succès) */
+    div[style*="color: #28a745"],
+    div[style*="color:#28a745"],
+    span[style*="color: #28a745"],
+    span[style*="color:#28a745"] {
+        color: #4caf50 !important;
+    }
+
+    /* Textes rouges (danger) */
+    div[style*="color: #dc3545"],
+    div[style*="color:#dc3545"],
+    span[style*="color: #dc3545"],
+    span[style*="color:#dc3545"] {
+        color: #f44336 !important;
+    }
+
+    /* Textes bleus (info) */
+    div[style*="color: #007cba"],
+    div[style*="color:#007cba"],
+    span[style*="color: #007cba"],
+    span[style*="color:#007cba"] {
+        color: #2196f3 !important;
+    }
+
+    /* Textes orange (warning) */
+    div[style*="color: #ffc107"],
+    div[style*="color:#ffc107"],
+    span[style*="color: #ffc107"],
+    span[style*="color:#ffc107"] {
+        color: #ff9800 !important;
+    }
+
+    /* Backgrounds verts */
+    div[style*="background: #d4edda"],
+    div[style*="background:#d4edda"] {
+        background: rgba(76, 175, 80, 0.2) !important;
+        border-color: #4caf50 !important;
+    }
+
+    /* Backgrounds rouges */
+    div[style*="background: #f8d7da"],
+    div[style*="background:#f8d7da"] {
+        background: rgba(244, 67, 54, 0.2) !important;
+        border-color: #f44336 !important;
+    }
+
+    /* Backgrounds bleus */
+    div[style*="background: #e3f2fd"],
+    div[style*="background:#e3f2fd"] {
+        background: rgba(33, 150, 243, 0.2) !important;
+        border-color: #2196f3 !important;
+    }
+
+    /* Backgrounds jaunes/warning */
+    div[style*="background: #fff3cd"],
+    div[style*="background:#fff3cd"] {
+        background: rgba(255, 152, 0, 0.2) !important;
+        border-color: #ff9800 !important;
+    }
+
+    /* Backgrounds gris clairs */
+    div[style*="background: #f8f9fa"],
+    div[style*="background:#f8f9fa"] {
+        background: rgba(255, 255, 255, 0.05) !important;
+    }
+}

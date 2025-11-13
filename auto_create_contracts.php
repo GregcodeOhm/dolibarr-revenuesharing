@@ -448,7 +448,7 @@ if ($action == 'create_contracts' && $confirm == 'yes' && !empty($selected_invoi
             </script>';
             
         } else {
-            print '<div style="background: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24;">';
+            print '<div style="background: var(--colorbacktabcard1); padding: 15px; border-radius: 5px; color: var(--colortext);">';
             print '<h4>Aucune facture candidate trouvée</h4>';
             print '<p>Aucun intervenant ne correspond aux collaborateurs actifs.</p>';
             print '<p><a href="analyze_extrafields.php" class="button">Retour à l\'analyse</a></p>';

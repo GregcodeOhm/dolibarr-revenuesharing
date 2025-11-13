@@ -34,8 +34,20 @@ if (!$has_permission) {
 // Parameters
 $year = GETPOST('year', 'int') ? GETPOST('year', 'int') : date('Y');
 $filter_collaborator = GETPOST('filter_collaborator', 'int');
+$clear_cache = GETPOST('clear_cache', 'int');
+
+// Vider le cache si demandé
+if ($clear_cache) {
+    $cache->deletePattern('dashboard_stats_*');
+    setEventMessages('Cache vidé avec succès', null, 'mesgs');
+    header('Location: '.$_SERVER['PHP_SELF'].'?year='.$year.($filter_collaborator ? '&filter_collaborator='.$filter_collaborator : ''));
+    exit;
+}
 
 llxHeader('', 'Revenue Sharing', '');
+
+// Load custom CSS
+print '<link rel="stylesheet" type="text/css" href="'.dol_buildpath('/revenuesharing/css/revenuesharing.css', 1).'">';
 
 print load_fiche_titre('Revenue Sharing Dashboard', '', 'generic');
 
@@ -44,6 +56,210 @@ print '<div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius
 print '<h3 style="margin: 0; color: #155724;">Module Revenue Sharing Opérationnel</h3>';
 print '<p style="margin: 5px 0 0 0;">Bienvenue '.$user->getFullName($langs).' ! Le module fonctionne correctement.</p>';
 print '</div>';
+
+// Lien vers les outils d'analyse
+print '<div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 5px; padding: 15px; margin: 15px 0;">';
+print '<h4 style="margin: 0 0 10px 0; color: #01579b;">🔍 Outils d\'analyse</h4>';
+print '<a href="'.dol_buildpath('/revenuesharing/tools/analyze_stu_discrepancy.php', 1).'" class="button" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">';
+print '📊 Analyser les écarts CA STU';
+print '</a>';
+print ' <span style="margin-left: 10px; color: #666;">Comparez les factures STU avec les contrats revenuesharing</span>';
+print '<br><br>';
+print '<a href="'.dol_buildpath('/revenuesharing/tools/unpaid_invoices.php', 1).'" class="button" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">';
+print '📧 Factures impayées par collaborateur';
+print '</a>';
+print ' <span style="margin-left: 10px; color: #666;">Générez un email de relance pour les factures impayées</span>';
+print '<br><br>';
+print '<a href="'.dol_buildpath('/revenuesharing/tools/check_invoice_continuity.php', 1).'" class="button" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">';
+print '🔢 Vérifier la continuité des factures';
+print '</a>';
+print ' <span style="margin-left: 10px; color: #666;">Détectez les trous dans la numérotation des factures par année</span>';
+print '<br><br>';
+print '<a href="'.dol_buildpath('/revenuesharing/tools/focal_margin_contracts.php', 1).'" class="button" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">';
+print '🎯 Contrats Marge Focal';
+print '</a>';
+print ' <span style="margin-left: 10px; color: #666;">Créez des contrats Revenue Sharing basés sur les marges Focal (40%/60%)</span>';
+print '</div>';
+
+// Sélecteur d'année et collaborateur (pour les sections suivantes)
+print '<div class="center" style="margin: 20px 0;">';
+print '<form method="GET" action="'.$_SERVER["PHP_SELF"].'" style="display: inline-block; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">';
+
+// Filtre collaborateur
+print '<strong>Collaborateur :</strong> ';
+print '<select name="filter_collaborator" style="font-size: 1em; padding: 5px; margin-right: 15px;">';
+print '<option value="">Tous les collaborateurs</option>';
+
+$sql_collabs_top = "SELECT rowid, label FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator WHERE active = 1 ORDER BY label";
+$resql_collabs_top = $db->query($sql_collabs_top);
+if ($resql_collabs_top) {
+    while ($obj_collab = $db->fetch_object($resql_collabs_top)) {
+        $selected = ($obj_collab->rowid == $filter_collaborator) ? ' selected' : '';
+        print '<option value="'.$obj_collab->rowid.'"'.$selected.'>'.dol_escape_htmltag($obj_collab->label).'</option>';
+    }
+    $db->free($resql_collabs_top);
+}
+print '</select>';
+
+// Filtre année
+print '<strong>Année :</strong> ';
+print '<select name="year" style="font-size: 1em; padding: 5px; margin-right: 10px;">';
+for ($y = date('Y'); $y >= date('Y') - 5; $y--) {
+    $selected = ($y == $year) ? ' selected' : '';
+    print '<option value="'.$y.'"'.$selected.'>'.$y.'</option>';
+}
+print '</select>';
+
+// Bouton Filtrer
+print '<input type="submit" value="Filtrer" class="button" style="padding: 5px 15px;">';
+
+print '</form>';
+
+// Bouton pour vider le cache
+print ' <a href="'.$_SERVER["PHP_SELF"].'?year='.$year.'&clear_cache=1'.($filter_collaborator ? '&filter_collaborator='.$filter_collaborator : '').'" class="button" style="margin-left: 10px;" title="Vider le cache pour actualiser les statistiques immédiatement">';
+print '🔄 Actualiser les stats';
+print '</a>';
+
+print '</div>';
+
+// Statistiques ventes Focal et marges
+$margeventesfocal_enabled = isModEnabled('margeventesfocal');
+$focal_stats = null;
+
+if ($margeventesfocal_enabled) {
+    // Requête pour récupérer les stats des ventes Focal (même logique que focal_margin_contracts.php)
+    $sql_focal = "SELECT
+        COUNT(DISTINCT f.rowid) as nb_factures,
+        SUM(fd.total_ht) as ventes_ht,
+        SUM(fd.qty * p.pmp) as couts_pmp,
+        SUM(fd.total_ht - (fd.qty * p.pmp)) as marge_totale
+    FROM ".MAIN_DB_PREFIX."facture f
+    INNER JOIN ".MAIN_DB_PREFIX."facturedet fd ON f.rowid = fd.fk_facture
+    INNER JOIN ".MAIN_DB_PREFIX."product p ON fd.fk_product = p.rowid
+    LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields pe ON p.rowid = pe.fk_object
+    WHERE YEAR(f.datef) = ".(int)$year."
+    AND f.fk_statut >= 1
+    AND f.entity IN (0,".$conf->entity.")
+    AND p.fk_product_type = 0
+    AND (pe.focal_is_focal = 1 OR p.ref LIKE '%focal%' OR p.ref LIKE '%JMlab%')";
+
+    if ($filter_collaborator > 0) {
+        // Si filtre collaborateur, récupérer uniquement ses contrats marge Focal
+        $sql_focal = "SELECT
+            COUNT(DISTINCT c.rowid) as nb_factures,
+            SUM(c.amount_ht) as marge_totale,
+            SUM(c.studio_amount_ht) as part_studio,
+            SUM(c.collaborator_amount_ht) as part_collaborateur
+        FROM ".MAIN_DB_PREFIX."revenuesharing_contract c
+        WHERE YEAR(c.date_creation) = ".(int)$year."
+        AND c.fk_collaborator = ".(int)$filter_collaborator."
+        AND c.ref LIKE 'MF%'";
+    }
+
+    $resql_focal = $db->query($sql_focal);
+    if ($resql_focal) {
+        $focal_stats = $db->fetch_object($resql_focal);
+        $db->free($resql_focal);
+    }
+}
+
+// Section Statistiques Ventes Focal
+if ($margeventesfocal_enabled && $focal_stats && ($focal_stats->nb_factures > 0)) {
+    // Calculer les valeurs selon le mode (avec ou sans filtre collaborateur)
+    if ($filter_collaborator > 0) {
+        // Mode contrats : on affiche les parts du contrat
+        $ventes_ht = 0; // Non applicable pour les contrats
+        $couts_pmp = 0; // Non applicable
+        $marge_totale = $focal_stats->marge_totale;
+        $part_studio = $focal_stats->part_studio;
+        $part_collaborateur = $focal_stats->part_collaborateur;
+        $taux_marge = 0; // Non applicable
+        $studio_percentage = ($marge_totale > 0) ? round(($part_studio / $marge_totale) * 100, 2) : 40;
+        $collab_percentage = 100 - $studio_percentage;
+    } else {
+        // Mode global : on affiche les stats des ventes
+        $ventes_ht = $focal_stats->ventes_ht;
+        $couts_pmp = $focal_stats->couts_pmp;
+        $marge_totale = $focal_stats->marge_totale;
+        $taux_marge = $ventes_ht > 0 ? round(($marge_totale / $ventes_ht) * 100, 2) : 0;
+        // Répartition par défaut 40/60
+        $part_studio = $marge_totale * 0.40;
+        $part_collaborateur = $marge_totale * 0.60;
+        $studio_percentage = 40;
+        $collab_percentage = 60;
+    }
+
+    print '<div style="background: linear-gradient(135deg, #6c85bd 0%, #8b9dc3 100%); border-radius: 8px; padding: 20px; margin: 15px 0; color: white;">';
+    print '<h3 style="margin: 0 0 15px 0; color: white; display: flex; align-items: center; gap: 10px;">';
+    print '<span style="font-size: 1.3em;">🎯</span>';
+    print '<span>Ventes Focal '.$year.'</span>';
+    print '</h3>';
+    print '<h4 style="margin: 10px 0 15px 0; color: white; font-size: 1em; opacity: 0.9;">📊 Résumé des marges Focal</h4>';
+
+    print '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">';
+
+    // Nombre de factures
+    print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
+    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Factures avec produits Focal</div>';
+    print '<div style="font-size: 2em; font-weight: bold;">'.$focal_stats->nb_factures.'</div>';
+    print '</div>';
+
+    // Total ventes HT (si mode global)
+    if (!$filter_collaborator) {
+        print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
+        print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Total ventes HT</div>';
+        print '<div style="font-size: 2em; font-weight: bold;">'.price($ventes_ht).' €</div>';
+        print '</div>';
+
+        // Total coûts PMP
+        print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
+        print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Total coûts (PMP)</div>';
+        print '<div style="font-size: 2em; font-weight: bold;">'.price($couts_pmp).' €</div>';
+        print '</div>';
+    }
+
+    // Marge totale
+    print '<div style="background: rgba(255,255,255,0.3); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px); border: 2px solid rgba(255,255,255,0.5);">';
+    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Marge totale</div>';
+    print '<div style="font-size: 2em; font-weight: bold;">'.price($marge_totale).' €</div>';
+    print '</div>';
+
+    // Taux de marge (si mode global)
+    if (!$filter_collaborator) {
+        print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
+        print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Taux de marge moyen</div>';
+        print '<div style="font-size: 2em; font-weight: bold;">'.$taux_marge.' %</div>';
+        print '</div>';
+    }
+
+    print '</div>';
+
+    // Répartition Ohmnibus / Collaborateur
+    print '<div style="background: rgba(255,255,255,0.15); padding: 15px; border-radius: 6px; margin-top: 15px;">';
+    print '<h5 style="margin: 0 0 15px 0; color: white;">💰 Répartition avec '.$studio_percentage.'% Ohmnibus / '.$collab_percentage.'% Collaborateur</h5>';
+    print '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">';
+
+    // Part Ohmnibus
+    print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
+    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Part Ohmnibus ('.$studio_percentage.'%)</div>';
+    print '<div style="font-size: 1.8em; font-weight: bold;">'.price($part_studio).' €</div>';
+    print '</div>';
+
+    // Part Collaborateur
+    print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
+    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Part Collaborateur ('.$collab_percentage.'%)</div>';
+    print '<div style="font-size: 1.8em; font-weight: bold;">'.price($part_collaborateur).' €</div>';
+    print '</div>';
+
+    print '</div>';
+    print '</div>';
+
+    print '<div style="margin-top: 15px; text-align: center;">';
+    print '<a href="'.dol_buildpath('/revenuesharing/tools/focal_margin_contracts.php?year='.$year.($filter_collaborator > 0 ? '&collaborator_id='.$filter_collaborator : ''), 1).'" class="button" style="background: white; color: #667eea; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; text-decoration: none;">Voir les détails / Créer des contrats</a>';
+    print '</div>';
+
+    print '</div>';
+}
 
 // Statistiques générales (via repositories avec cache)
 try {
@@ -57,7 +273,7 @@ try {
     }, 600);
 
 } catch (Exception $e) {
-    print '<div style="background: #f8d7da; border: 1px solid #dc3545; color: #721c24; padding: 15px; margin: 20px 0; border-radius: 4px;">';
+    print '<div style="background: var(--colorbacktabcard1); border: 1px solid #dc3545; color: var(--colortext); padding: 15px; margin: 20px 0; border-radius: 4px;">';
     print '<strong>⚠️ Erreur Dashboard:</strong> '.htmlspecialchars($e->getMessage());
     print '</div>';
     $nb_collaborators = 0;
@@ -101,36 +317,12 @@ foreach ($tables_to_check as $table => $desc) {
 
 print '<div class="fichecenter">';
 
-// Sélecteur d'année et collaborateur
-print '<div class="center" style="margin: 15px 0;">';
-print '<form method="GET" action="'.$_SERVER["PHP_SELF"].'" style="display: inline-block; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">';
-
-// Filtre collaborateur
-print ' <strong>Collaborateur :</strong> ';
-print '<select name="filter_collaborator" onchange="this.form.submit()" style="font-size: 1em; padding: 5px; margin-right: 15px;">';
-print '<option value="">Tous les collaborateurs</option>';
-
-$sql_collabs = "SELECT rowid, label FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator WHERE active = 1 ORDER BY label";
-$resql_collabs = $db->query($sql_collabs);
-if ($resql_collabs) {
-    while ($obj_collab = $db->fetch_object($resql_collabs)) {
-        $selected = ($obj_collab->rowid == $filter_collaborator) ? ' selected' : '';
-        print '<option value="'.$obj_collab->rowid.'"'.$selected.'>'.dol_escape_htmltag($obj_collab->label).'</option>';
-    }
-    $db->free($resql_collabs);
-}
-print '</select>';
-
-// Filtre année
-print '<strong>Année :</strong> ';
-print '<select name="year" onchange="this.form.submit()" style="font-size: 1em; padding: 5px;">';
-for ($y = date('Y'); $y >= date('Y') - 5; $y--) {
-    $selected = ($y == $year) ? ' selected' : '';
-    print '<option value="'.$y.'"'.$selected.'>'.$y.'</option>';
-}
-print '</select>';
-
-print '</form>';
+// Titre section Prestations Studio
+print '<div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border-radius: 8px; padding: 15px; margin: 15px 0; color: white;">';
+print '<h3 style="margin: 0; color: white; display: flex; align-items: center; gap: 10px;">';
+print '<span style="font-size: 1.3em;">🎬</span>';
+print '<span>Prestations Studio '.$year.'</span>';
+print '</h3>';
 print '</div>';
 
 // Boxes statistiques principales
@@ -180,7 +372,7 @@ print '<div style="font-size: 1.5em; font-weight: bold; color: #ffc107;">'.price
 print '<div>Revenus collaborateurs</div>';
 if ($stats['total_studio'] > 0) {
     $percentage = $stats['total_ht'] > 0 ? round(($stats['total_collaborator'] / $stats['total_ht']) * 100, 1) : 0;
-    print '<div style="font-size: 0.9em; color: #666;">('.$percentage.'% du CA)</div>';
+    print '<div style="font-size: 0.9em; color: var(--colortextbackhmenu);">('.$percentage.'% du CA)</div>';
 }
 print '</td>';
 
@@ -216,7 +408,7 @@ if ($stats['total_ht'] > 0) {
 
     print '</div>';
 } else {
-    print '<div class="center" style="padding: 15px; color: #666;">Aucun contrat validé pour '.$year.'</div>';
+    print '<div class="center" style="padding: 15px; color: var(--colortextbackhmenu);">Aucun contrat validé pour '.$year.'</div>';
 }
 
 // Historique des 5 dernières années
@@ -228,8 +420,11 @@ print '<th class="center">Contrats</th>';
 print '<th class="center">CA Total</th>';
 print '<th class="center">Part Collaborateurs</th>';
 print '<th class="center">Part Studio</th>';
+print '<th class="center">Progression</th>';
 print '</tr>';
 
+// D'abord collecter toutes les données pour pouvoir calculer les progressions correctement
+$years_data = array();
 for ($y = date('Y'); $y >= date('Y') - 4; $y--) {
     $sql_year = "SELECT COUNT(CASE WHEN status >= 1 THEN 1 END) as nb_valid,";
     $sql_year .= " COALESCE(SUM(CASE WHEN status >= 1 THEN amount_ht ELSE 0 END), 0) as total_ht,";
@@ -239,28 +434,63 @@ for ($y = date('Y'); $y >= date('Y') - 4; $y--) {
     if ($filter_collaborator > 0) {
         $sql_year .= " AND fk_collaborator = ".((int) $filter_collaborator);
     }
-    
+
     $resql_year = $db->query($sql_year);
     if ($resql_year) {
         $obj_year = $db->fetch_object($resql_year);
-        $year_total_ht = $obj_year->total_ht ? $obj_year->total_ht : 0;
-        $year_total_collab = $obj_year->total_collaborator ? $obj_year->total_collaborator : 0;
-        $year_total_studio = $year_total_ht - $year_total_collab;
-        
-        $row_style = ($y == $year) ? ' style="background-color: #e3f2fd; font-weight: bold;"' : '';
-        
-        print '<tr class="oddeven"'.$row_style.'>';
-        print '<td class="center">'.$y.($y == $year ? ' (actuelle)' : '').'</td>';
-        print '<td class="center">'.$obj_year->nb_valid.'</td>';
-        print '<td class="center">'.price($year_total_ht).'</td>';
-        print '<td class="center">'.price($year_total_collab).'</td>';
-        print '<td class="center">'.price($year_total_studio).'</td>';
-        print '</tr>';
-        
+        $years_data[$y] = array(
+            'nb_valid' => $obj_year->nb_valid,
+            'total_ht' => $obj_year->total_ht ? $obj_year->total_ht : 0,
+            'total_collaborator' => $obj_year->total_collaborator ? $obj_year->total_collaborator : 0
+        );
         $db->free($resql_year);
     } else {
-        print '<tr class="oddeven"><td class="center">'.$y.'</td><td colspan="4" class="center">Erreur</td></tr>';
+        $years_data[$y] = null;
     }
+}
+
+// Afficher les lignes avec progression calculée par rapport à l'année précédente (N-1)
+for ($y = date('Y'); $y >= date('Y') - 4; $y--) {
+    if ($years_data[$y] === null) {
+        print '<tr class="oddeven"><td class="center">'.$y.'</td><td colspan="5" class="center">Erreur</td></tr>';
+        continue;
+    }
+
+    $year_total_ht = $years_data[$y]['total_ht'];
+    $year_total_collab = $years_data[$y]['total_collaborator'];
+    $year_total_studio = $year_total_ht - $year_total_collab;
+
+    // Calculer la progression par rapport à l'année précédente (N-1)
+    $progression_text = '-';
+    $progression_color = '';
+    $previous_year = $y - 1;
+    if (isset($years_data[$previous_year]) && $years_data[$previous_year] !== null) {
+        $previous_year_ht = $years_data[$previous_year]['total_ht'];
+        if ($previous_year_ht > 0) {
+            $progression_pct = round((($year_total_ht - $previous_year_ht) / $previous_year_ht) * 100, 1);
+            if ($progression_pct > 0) {
+                $progression_text = '+'.number_format($progression_pct, 1, ',', ' ').'%';
+                $progression_color = ' style="color: #28a745; font-weight: bold;"';
+            } elseif ($progression_pct < 0) {
+                $progression_text = number_format($progression_pct, 1, ',', ' ').'%';
+                $progression_color = ' style="color: #dc3545; font-weight: bold;"';
+            } else {
+                $progression_text = '0%';
+                $progression_color = ' style="color: #6c757d;"';
+            }
+        }
+    }
+
+    $row_style = ($y == $year) ? ' style="background-color: #e3f2fd; font-weight: bold;"' : '';
+
+    print '<tr class="oddeven"'.$row_style.'>';
+    print '<td class="center">'.$y.($y == $year ? ' (actuelle)' : '').'</td>';
+    print '<td class="center">'.$years_data[$y]['nb_valid'].'</td>';
+    print '<td class="center">'.price($year_total_ht).'</td>';
+    print '<td class="center">'.price($year_total_collab).'</td>';
+    print '<td class="center">'.price($year_total_studio).'</td>';
+    print '<td class="center"'.$progression_color.'>'.$progression_text.'</td>';
+    print '</tr>';
 }
 
 print '</table>';
@@ -273,6 +503,7 @@ if ($stats['nb_valid'] > 0 && !$filter_collaborator) {
 
     $sql_top = "SELECT c.rowid, c.label, u.firstname, u.lastname,";
     $sql_top .= " COUNT(rc.rowid) as nb_contracts,";
+    $sql_top .= " COALESCE(SUM(rc.amount_ht), 0) as total_ca,";
     $sql_top .= " COALESCE(SUM(rc.net_collaborator_amount), 0) as total_revenue";
     $sql_top .= " FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator c";
     $sql_top .= " LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = c.fk_user";
@@ -289,6 +520,7 @@ if ($stats['nb_valid'] > 0 && !$filter_collaborator) {
         print '<tr class="liste_titre">';
         print '<th>Collaborateur</th>';
         print '<th class="center">Contrats</th>';
+        print '<th class="center">CA Total</th>';
         print '<th class="center">Revenus nets</th>';
         print '<th class="center">Part du CA</th>';
         print '</tr>';
@@ -301,6 +533,7 @@ if ($stats['nb_valid'] > 0 && !$filter_collaborator) {
             print ($obj_top->label ? $obj_top->label : $obj_top->firstname.' '.$obj_top->lastname);
             print '</a></td>';
             print '<td class="center">'.$obj_top->nb_contracts.'</td>';
+            print '<td class="center">'.price($obj_top->total_ca).'</td>';
             print '<td class="center"><strong>'.price($obj_top->total_revenue).'</strong></td>';
             print '<td class="center">'.$percentage_of_total.'%</td>';
             print '</tr>';
@@ -323,6 +556,7 @@ if ($has_permission) {
 if ($user->admin) {
     print '<a href="auto_create_contracts.php" class="butAction" style="background: #fd7e14; color: white;"> Auto-création contrats</a> ';
     print '<a href="account_transaction.php" class="butAction" style="background: #17a2b8; color: white;">'.img_picto('', 'bank', 'class="pictofixedwidth"').' Nouvelle opération</a> ';
+    print '<a href="payroll_import.php" class="butAction" style="background: #6c757d; color: white;">'.img_picto('', 'technic', 'class="pictofixedwidth"').' Import Paie</a> ';
     print '<a href="admin/setup.php" class="butAction">'.img_picto('', 'setup', 'class="pictofixedwidth"').' Configuration</a>';
 }
 print '</div>';

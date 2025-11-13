@@ -39,8 +39,32 @@ $num_trans = count($transactions);
 
             <?php
             $running_balance = 0;
+            $previous_month = null;
+            $month_names = array(
+                1 => 'Janvier', 2 => 'Février', 3 => 'Mars', 4 => 'Avril',
+                5 => 'Mai', 6 => 'Juin', 7 => 'Juillet', 8 => 'Août',
+                9 => 'Septembre', 10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre'
+            );
+
             foreach ($transactions as $trans):
                 $running_balance += $trans->amount;
+
+                // Détecter le changement de mois
+                $trans_date = $db->jdate($trans->display_date);
+                $current_month = date('Y-m', $trans_date);
+                $current_month_name = $month_names[(int)date('n', $trans_date)] . ' ' . date('Y', $trans_date);
+
+                // Afficher le séparateur de mois (toujours afficher pour le premier, ensuite si changement détecté)
+                if ($previous_month === null || $previous_month !== $current_month):
+            ?>
+                <tr class="liste_titre" style="background: #f0f0f0;">
+                    <td colspan="8" style="padding: 8px; font-weight: bold; color: #666; border-top: 2px solid #ccc; border-bottom: 2px solid #ccc;">
+                        <?php echo $current_month_name; ?>
+                    </td>
+                </tr>
+            <?php
+                endif;
+                $previous_month = $current_month;
 
                 // Type avec couleur selon crédit/débit
                 $credit_types = array('contract', 'commission', 'bonus', 'interest', 'other_credit');
