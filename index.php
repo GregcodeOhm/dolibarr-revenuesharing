@@ -74,6 +74,11 @@ print '<a href="'.dol_buildpath('/revenuesharing/tools/check_invoice_continuity.
 print '🔢 Vérifier la continuité des factures';
 print '</a>';
 print ' <span style="margin-left: 10px; color: #666;">Détectez les trous dans la numérotation des factures par année</span>';
+print '<br><br>';
+print '<a href="'.dol_buildpath('/revenuesharing/tools/focal_margin_contracts.php', 1).'" class="button" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">';
+print '🎯 Contrats Marge Focal';
+print '</a>';
+print ' <span style="margin-left: 10px; color: #666;">Créez des contrats Revenue Sharing basés sur les marges Focal (40%/60%)</span>';
 print '</div>';
 
 // Statistiques générales (via repositories avec cache)
