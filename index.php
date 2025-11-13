@@ -81,6 +81,95 @@ print '</a>';
 print ' <span style="margin-left: 10px; color: #666;">Créez des contrats Revenue Sharing basés sur les marges Focal (40%/60%)</span>';
 print '</div>';
 
+// Statistiques ventes Focal et marges
+$margeventesfocal_enabled = isModEnabled('margeventesfocal');
+$focal_stats = null;
+
+if ($margeventesfocal_enabled) {
+    // Requête pour récupérer les stats des ventes Focal
+    $sql_focal = "SELECT
+        COUNT(DISTINCT f.rowid) as nb_factures,
+        SUM(fd.total_ht) as ca_total_ht,
+        SUM(fd.qty * p.pmp) as cout_total_pmp,
+        SUM(fd.total_ht - (fd.qty * p.pmp)) as marge_totale
+    FROM ".MAIN_DB_PREFIX."facture f
+    INNER JOIN ".MAIN_DB_PREFIX."facturedet fd ON f.rowid = fd.fk_facture
+    INNER JOIN ".MAIN_DB_PREFIX."product p ON fd.fk_product = p.rowid
+    LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields pe ON p.rowid = pe.fk_object
+    WHERE YEAR(f.datef) = ".(int)$year."
+    AND f.fk_statut >= 1
+    AND f.entity IN (0,".$conf->entity.")
+    AND p.fk_product_type = 0
+    AND (pe.focal_is_focal = 1 OR p.ref LIKE '%focal%' OR p.ref LIKE '%JMlab%')";
+
+    if ($filter_collaborator > 0) {
+        // Si filtre collaborateur, récupérer uniquement ses contrats marge Focal
+        $sql_focal = "SELECT
+            COUNT(DISTINCT c.rowid) as nb_factures,
+            SUM(c.amount_ht) as marge_totale,
+            SUM(c.studio_amount_ht) as cout_total_pmp,
+            SUM(c.collaborator_amount_ht) as ca_total_ht
+        FROM ".MAIN_DB_PREFIX."revenuesharing_contract c
+        WHERE YEAR(c.date_creation) = ".(int)$year."
+        AND c.fk_collaborator = ".(int)$filter_collaborator."
+        AND c.ref LIKE 'MF%'";
+    }
+
+    $resql_focal = $db->query($sql_focal);
+    if ($resql_focal) {
+        $focal_stats = $db->fetch_object($resql_focal);
+        $db->free($resql_focal);
+    }
+}
+
+// Section Statistiques Ventes Focal
+if ($margeventesfocal_enabled && $focal_stats && $focal_stats->ca_total_ht > 0) {
+    $taux_marge = $focal_stats->ca_total_ht > 0 ? round(($focal_stats->marge_totale / ($focal_stats->ca_total_ht + $focal_stats->cout_total_pmp)) * 100, 2) : 0;
+
+    print '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; padding: 20px; margin: 15px 0; color: white;">';
+    print '<h4 style="margin: 0 0 15px 0; color: white; display: flex; align-items: center; gap: 10px;">';
+    print '<span style="font-size: 1.5em;">🎯</span>';
+    print 'Ventes Focal '.$year.($filter_collaborator > 0 ? ' - Contrats Marge Focal' : '');
+    print '</h4>';
+
+    print '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">';
+
+    // Nombre de factures
+    print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
+    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Factures Focal</div>';
+    print '<div style="font-size: 2em; font-weight: bold;">'.$focal_stats->nb_factures.'</div>';
+    print '</div>';
+
+    // CA Total
+    print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
+    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">'.($filter_collaborator > 0 ? 'Marge totale' : 'CA Ventes HT').'</div>';
+    print '<div style="font-size: 2em; font-weight: bold;">'.price($focal_stats->ca_total_ht + $focal_stats->cout_total_pmp).' €</div>';
+    print '</div>';
+
+    // Coût Total
+    print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
+    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">'.($filter_collaborator > 0 ? 'Part Studio' : 'Coût PMP').'</div>';
+    print '<div style="font-size: 2em; font-weight: bold;">'.price($focal_stats->cout_total_pmp).' €</div>';
+    print '</div>';
+
+    // Marge
+    print '<div style="background: rgba(255,255,255,0.3); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px); border: 2px solid rgba(255,255,255,0.5);">';
+    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">'.($filter_collaborator > 0 ? 'Part Collaborateur' : 'Marge brute').'</div>';
+    print '<div style="font-size: 2em; font-weight: bold;">'.price($focal_stats->marge_totale).' €</div>';
+    if (!$filter_collaborator) {
+        print '<div style="font-size: 0.9em; opacity: 0.8; margin-top: 5px;">'.$taux_marge.'% de marge</div>';
+    }
+    print '</div>';
+
+    print '</div>';
+
+    print '<div style="margin-top: 15px; text-align: center;">';
+    print '<a href="'.dol_buildpath('/revenuesharing/tools/focal_margin_contracts.php?year='.$year.($filter_collaborator > 0 ? '&collaborator_id='.$filter_collaborator : ''), 1).'" class="button" style="background: white; color: #667eea; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; text-decoration: none;">Voir les détails / Créer des contrats</a>';
+    print '</div>';
+
+    print '</div>';
+}
+
 // Statistiques générales (via repositories avec cache)
 try {
     // 1. Nombre de collaborateurs
