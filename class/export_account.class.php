@@ -89,14 +89,29 @@ class ExportAccount
      */
     public function loadCAData($filter_year = 0)
     {
-        $sql_ca = "SELECT 
+        $sql_ca = "SELECT
             COALESCE(SUM(f.total_ht), 0) as ca_total_ht,
             COALESCE(SUM(f.total_ttc), 0) as ca_total_ttc,
             COALESCE(SUM(c.collaborator_amount_ht), 0) as collaborator_total_ht,
             COALESCE(SUM(c.studio_amount_ht), 0) as studio_total_ht,
             AVG(c.collaborator_percentage) as avg_percentage,
             COUNT(DISTINCT f.rowid) as nb_factures_clients,
-            COUNT(DISTINCT c.rowid) as nb_contrats
+            COUNT(DISTINCT c.rowid) as nb_contrats,
+
+            -- Distinction Studio / Focal (ref MF*)
+            COALESCE(SUM(CASE WHEN c.ref LIKE 'MF%' THEN c.amount_ht ELSE 0 END), 0) as ca_focal_ht,
+            COALESCE(SUM(CASE WHEN c.ref NOT LIKE 'MF%' THEN f.total_ht ELSE 0 END), 0) as ca_studio_ht,
+            COUNT(DISTINCT CASE WHEN c.ref LIKE 'MF%' THEN c.rowid END) as nb_contrats_focal,
+            COUNT(DISTINCT CASE WHEN c.ref NOT LIKE 'MF%' THEN c.rowid END) as nb_contrats_studio,
+
+            -- Parts collaborateur Studio/Focal
+            COALESCE(SUM(CASE WHEN c.ref LIKE 'MF%' THEN c.collaborator_amount_ht ELSE 0 END), 0) as collaborator_focal_ht,
+            COALESCE(SUM(CASE WHEN c.ref NOT LIKE 'MF%' THEN c.collaborator_amount_ht ELSE 0 END), 0) as collaborator_studio_ht,
+
+            -- Parts studio Studio/Focal
+            COALESCE(SUM(CASE WHEN c.ref LIKE 'MF%' THEN c.studio_amount_ht ELSE 0 END), 0) as studio_focal_ht,
+            COALESCE(SUM(CASE WHEN c.ref NOT LIKE 'MF%' THEN c.studio_amount_ht ELSE 0 END), 0) as studio_studio_ht
+
             FROM ".MAIN_DB_PREFIX."revenuesharing_contract c
             LEFT JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = c.fk_facture AND f.fk_statut IN (1,2)
             WHERE c.fk_collaborator = ".$this->collaborator_id." AND c.status = 1";
@@ -104,7 +119,7 @@ class ExportAccount
         if ($filter_year > 0) {
             $sql_ca .= " AND YEAR(f.datef) = ".(int)$filter_year;
         }
-        
+
         $resql_ca = $this->db->query($sql_ca);
         if ($resql_ca) {
             $this->ca_info = $this->db->fetch_object($resql_ca);
@@ -376,7 +391,58 @@ class ExportAccount
             
             $pdf->Cell(60, 6, 'Nombre de contrats:', 0, 0);
             $pdf->Cell(0, 6, $this->ca_info->nb_contrats, 0, 1);
-            
+
+            // Détail Prestations Studio / Ventes Focal
+            if (isset($this->ca_info->ca_studio_ht) && isset($this->ca_info->ca_focal_ht) && ($this->ca_info->ca_studio_ht > 0 || $this->ca_info->ca_focal_ht > 0)) {
+                $pdf->Ln(3);
+                $pdf->SetFont('helvetica', 'B', 11);
+                $pdf->Cell(0, 6, 'Detail Prestations Studio / Ventes Focal:', 0, 1);
+                $pdf->SetFont('helvetica', '', 10);
+
+                // Prestations Studio
+                if ($this->ca_info->ca_studio_ht > 0 || $this->ca_info->nb_contrats_studio > 0) {
+                    $pdf->SetFont('helvetica', 'B', 10);
+                    $pdf->Cell(0, 6, '  PRESTATIONS STUDIO', 0, 1);
+                    $pdf->SetFont('helvetica', '', 10);
+
+                    $pdf->Cell(60, 5, '    CA Studio HT:', 0, 0);
+                    $pdf->Cell(0, 5, price($this->ca_info->ca_studio_ht).' EUR', 0, 1);
+
+                    $pdf->Cell(60, 5, '    Part Collaborateur:', 0, 0);
+                    $pdf->Cell(0, 5, price($this->ca_info->collaborator_studio_ht).' EUR', 0, 1);
+
+                    $pdf->Cell(60, 5, '    Part Studio:', 0, 0);
+                    $pdf->Cell(0, 5, price($this->ca_info->studio_studio_ht).' EUR', 0, 1);
+
+                    if ($this->ca_info->nb_contrats_studio > 0) {
+                        $pdf->Cell(60, 5, '    Nombre contrats:', 0, 0);
+                        $pdf->Cell(0, 5, $this->ca_info->nb_contrats_studio, 0, 1);
+                    }
+                }
+
+                // Ventes Focal
+                if ($this->ca_info->ca_focal_ht > 0 || $this->ca_info->nb_contrats_focal > 0) {
+                    $pdf->Ln(2);
+                    $pdf->SetFont('helvetica', 'B', 10);
+                    $pdf->Cell(0, 6, '  VENTES FOCAL', 0, 1);
+                    $pdf->SetFont('helvetica', '', 10);
+
+                    $pdf->Cell(60, 5, '    Marge Focal HT:', 0, 0);
+                    $pdf->Cell(0, 5, price($this->ca_info->ca_focal_ht).' EUR', 0, 1);
+
+                    $pdf->Cell(60, 5, '    Part Collaborateur:', 0, 0);
+                    $pdf->Cell(0, 5, price($this->ca_info->collaborator_focal_ht).' EUR', 0, 1);
+
+                    $pdf->Cell(60, 5, '    Part Ohmnibus:', 0, 0);
+                    $pdf->Cell(0, 5, price($this->ca_info->studio_focal_ht).' EUR', 0, 1);
+
+                    if ($this->ca_info->nb_contrats_focal > 0) {
+                        $pdf->Cell(60, 5, '    Nombre contrats MF:', 0, 0);
+                        $pdf->Cell(0, 5, $this->ca_info->nb_contrats_focal, 0, 1);
+                    }
+                }
+            }
+
         }
 
         $pdf->Ln(5);
@@ -1235,6 +1301,66 @@ class ExportAccount
                     <td class="value">'.$this->ca_info->nb_contrats.'</td>
                 </tr>
             </table>';
+
+            // Détail Prestations Studio / Ventes Focal
+            if (isset($this->ca_info->ca_studio_ht) && isset($this->ca_info->ca_focal_ht) && ($this->ca_info->ca_studio_ht > 0 || $this->ca_info->ca_focal_ht > 0)) {
+                $html .= '<div class="section-title" style="margin-top: 15px;">DÉTAIL PRESTATIONS STUDIO / VENTES FOCAL</div>
+                <table class="summary-table">';
+
+                // Prestations Studio
+                if ($this->ca_info->ca_studio_ht > 0 || $this->ca_info->nb_contrats_studio > 0) {
+                    $html .= '<tr style="background: #e8f5e9;">
+                        <td colspan="2" style="font-weight: bold; padding: 8px;">PRESTATIONS STUDIO</td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;&nbsp;&nbsp;CA Studio HT:</td>
+                        <td class="value">'.price($this->ca_info->ca_studio_ht).' €</td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;&nbsp;&nbsp;Part Collaborateur:</td>
+                        <td class="value">'.price($this->ca_info->collaborator_studio_ht).' €</td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;&nbsp;&nbsp;Part Studio:</td>
+                        <td class="value">'.price($this->ca_info->studio_studio_ht).' €</td>
+                    </tr>';
+
+                    if ($this->ca_info->nb_contrats_studio > 0) {
+                        $html .= '<tr>
+                            <td>&nbsp;&nbsp;&nbsp;Nombre contrats:</td>
+                            <td class="value">'.$this->ca_info->nb_contrats_studio.'</td>
+                        </tr>';
+                    }
+                }
+
+                // Ventes Focal
+                if ($this->ca_info->ca_focal_ht > 0 || $this->ca_info->nb_contrats_focal > 0) {
+                    $html .= '<tr style="background: #e8eaf6;">
+                        <td colspan="2" style="font-weight: bold; padding: 8px;">VENTES FOCAL</td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;&nbsp;&nbsp;Marge Focal HT:</td>
+                        <td class="value">'.price($this->ca_info->ca_focal_ht).' €</td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;&nbsp;&nbsp;Part Collaborateur:</td>
+                        <td class="value">'.price($this->ca_info->collaborator_focal_ht).' €</td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;&nbsp;&nbsp;Part Ohmnibus:</td>
+                        <td class="value">'.price($this->ca_info->studio_focal_ht).' €</td>
+                    </tr>';
+
+                    if ($this->ca_info->nb_contrats_focal > 0) {
+                        $html .= '<tr>
+                            <td>&nbsp;&nbsp;&nbsp;Nombre contrats MF:</td>
+                            <td class="value">'.$this->ca_info->nb_contrats_focal.'</td>
+                        </tr>';
+                    }
+                }
+
+                $html .= '</table>';
+            }
         }
 
         // Résumé financier
