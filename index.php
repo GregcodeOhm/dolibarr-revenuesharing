@@ -420,8 +420,10 @@ print '<th class="center">Contrats</th>';
 print '<th class="center">CA Total</th>';
 print '<th class="center">Part Collaborateurs</th>';
 print '<th class="center">Part Studio</th>';
+print '<th class="center">Progression</th>';
 print '</tr>';
 
+$previous_year_ca = 0;
 for ($y = date('Y'); $y >= date('Y') - 4; $y--) {
     $sql_year = "SELECT COUNT(CASE WHEN status >= 1 THEN 1 END) as nb_valid,";
     $sql_year .= " COALESCE(SUM(CASE WHEN status >= 1 THEN amount_ht ELSE 0 END), 0) as total_ht,";
@@ -431,27 +433,48 @@ for ($y = date('Y'); $y >= date('Y') - 4; $y--) {
     if ($filter_collaborator > 0) {
         $sql_year .= " AND fk_collaborator = ".((int) $filter_collaborator);
     }
-    
+
     $resql_year = $db->query($sql_year);
     if ($resql_year) {
         $obj_year = $db->fetch_object($resql_year);
         $year_total_ht = $obj_year->total_ht ? $obj_year->total_ht : 0;
         $year_total_collab = $obj_year->total_collaborator ? $obj_year->total_collaborator : 0;
         $year_total_studio = $year_total_ht - $year_total_collab;
-        
+
+        // Calculer la progression par rapport à l'année N+1 (année suivante dans la boucle qui descend)
+        $progression_text = '-';
+        $progression_color = '';
+        if ($previous_year_ca > 0 && $year_total_ht > 0) {
+            $progression_pct = round((($year_total_ht - $previous_year_ca) / $previous_year_ca) * 100, 1);
+            if ($progression_pct > 0) {
+                $progression_text = '+'.number_format($progression_pct, 1, ',', ' ').'%';
+                $progression_color = ' style="color: #28a745; font-weight: bold;"';
+            } elseif ($progression_pct < 0) {
+                $progression_text = number_format($progression_pct, 1, ',', ' ').'%';
+                $progression_color = ' style="color: #dc3545; font-weight: bold;"';
+            } else {
+                $progression_text = '0%';
+                $progression_color = ' style="color: #6c757d;"';
+            }
+        }
+
         $row_style = ($y == $year) ? ' style="background-color: #e3f2fd; font-weight: bold;"' : '';
-        
+
         print '<tr class="oddeven"'.$row_style.'>';
         print '<td class="center">'.$y.($y == $year ? ' (actuelle)' : '').'</td>';
         print '<td class="center">'.$obj_year->nb_valid.'</td>';
         print '<td class="center">'.price($year_total_ht).'</td>';
         print '<td class="center">'.price($year_total_collab).'</td>';
         print '<td class="center">'.price($year_total_studio).'</td>';
+        print '<td class="center"'.$progression_color.'>'.$progression_text.'</td>';
         print '</tr>';
-        
+
+        // Stocker le CA de cette année pour la prochaine itération
+        $previous_year_ca = $year_total_ht;
+
         $db->free($resql_year);
     } else {
-        print '<tr class="oddeven"><td class="center">'.$y.'</td><td colspan="4" class="center">Erreur</td></tr>';
+        print '<tr class="oddeven"><td class="center">'.$y.'</td><td colspan="5" class="center">Erreur</td></tr>';
     }
 }
 
@@ -465,6 +488,7 @@ if ($stats['nb_valid'] > 0 && !$filter_collaborator) {
 
     $sql_top = "SELECT c.rowid, c.label, u.firstname, u.lastname,";
     $sql_top .= " COUNT(rc.rowid) as nb_contracts,";
+    $sql_top .= " COALESCE(SUM(rc.amount_ht), 0) as total_ca,";
     $sql_top .= " COALESCE(SUM(rc.net_collaborator_amount), 0) as total_revenue";
     $sql_top .= " FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator c";
     $sql_top .= " LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = c.fk_user";
@@ -481,6 +505,7 @@ if ($stats['nb_valid'] > 0 && !$filter_collaborator) {
         print '<tr class="liste_titre">';
         print '<th>Collaborateur</th>';
         print '<th class="center">Contrats</th>';
+        print '<th class="center">CA Total</th>';
         print '<th class="center">Revenus nets</th>';
         print '<th class="center">Part du CA</th>';
         print '</tr>';
@@ -493,6 +518,7 @@ if ($stats['nb_valid'] > 0 && !$filter_collaborator) {
             print ($obj_top->label ? $obj_top->label : $obj_top->firstname.' '.$obj_top->lastname);
             print '</a></td>';
             print '<td class="center">'.$obj_top->nb_contracts.'</td>';
+            print '<td class="center">'.price($obj_top->total_ca).'</td>';
             print '<td class="center"><strong>'.price($obj_top->total_revenue).'</strong></td>';
             print '<td class="center">'.$percentage_of_total.'%</td>';
             print '</tr>';
