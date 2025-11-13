@@ -81,6 +81,47 @@ print '</a>';
 print ' <span style="margin-left: 10px; color: #666;">Créez des contrats Revenue Sharing basés sur les marges Focal (40%/60%)</span>';
 print '</div>';
 
+// Sélecteur d'année et collaborateur (pour les sections suivantes)
+print '<div class="center" style="margin: 20px 0;">';
+print '<form method="GET" action="'.$_SERVER["PHP_SELF"].'" style="display: inline-block; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">';
+
+// Filtre collaborateur
+print '<strong>Collaborateur :</strong> ';
+print '<select name="filter_collaborator" style="font-size: 1em; padding: 5px; margin-right: 15px;">';
+print '<option value="">Tous les collaborateurs</option>';
+
+$sql_collabs_top = "SELECT rowid, label FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator WHERE active = 1 ORDER BY label";
+$resql_collabs_top = $db->query($sql_collabs_top);
+if ($resql_collabs_top) {
+    while ($obj_collab = $db->fetch_object($resql_collabs_top)) {
+        $selected = ($obj_collab->rowid == $filter_collaborator) ? ' selected' : '';
+        print '<option value="'.$obj_collab->rowid.'"'.$selected.'>'.dol_escape_htmltag($obj_collab->label).'</option>';
+    }
+    $db->free($resql_collabs_top);
+}
+print '</select>';
+
+// Filtre année
+print '<strong>Année :</strong> ';
+print '<select name="year" style="font-size: 1em; padding: 5px; margin-right: 10px;">';
+for ($y = date('Y'); $y >= date('Y') - 5; $y--) {
+    $selected = ($y == $year) ? ' selected' : '';
+    print '<option value="'.$y.'"'.$selected.'>'.$y.'</option>';
+}
+print '</select>';
+
+// Bouton Filtrer
+print '<input type="submit" value="Filtrer" class="button" style="padding: 5px 15px;">';
+
+print '</form>';
+
+// Bouton pour vider le cache
+print ' <a href="'.$_SERVER["PHP_SELF"].'?year='.$year.'&clear_cache=1'.($filter_collaborator ? '&filter_collaborator='.$filter_collaborator : '').'" class="button" style="margin-left: 10px;" title="Vider le cache pour actualiser les statistiques immédiatement">';
+print '🔄 Actualiser les stats';
+print '</a>';
+
+print '</div>';
+
 // Statistiques ventes Focal et marges
 $margeventesfocal_enabled = isModEnabled('margeventesfocal');
 $focal_stats = null;
@@ -148,7 +189,7 @@ if ($margeventesfocal_enabled && $focal_stats && ($focal_stats->nb_factures > 0)
         $collab_percentage = 60;
     }
 
-    print '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; padding: 20px; margin: 15px 0; color: white;">';
+    print '<div style="background: linear-gradient(135deg, #6c85bd 0%, #8b9dc3 100%); border-radius: 8px; padding: 20px; margin: 15px 0; color: white;">';
     print '<h3 style="margin: 0 0 15px 0; color: white; display: flex; align-items: center; gap: 10px;">';
     print '<span style="font-size: 1.3em;">🎯</span>';
     print '<span>Ventes Focal '.$year.'</span>';
@@ -275,44 +316,6 @@ foreach ($tables_to_check as $table => $desc) {
 }
 
 print '<div class="fichecenter">';
-
-// Sélecteur d'année et collaborateur
-print '<div class="center" style="margin: 15px 0;">';
-print '<form method="GET" action="'.$_SERVER["PHP_SELF"].'" style="display: inline-block; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">';
-
-// Filtre collaborateur
-print ' <strong>Collaborateur :</strong> ';
-print '<select name="filter_collaborator" onchange="this.form.submit()" style="font-size: 1em; padding: 5px; margin-right: 15px;">';
-print '<option value="">Tous les collaborateurs</option>';
-
-$sql_collabs = "SELECT rowid, label FROM ".MAIN_DB_PREFIX."revenuesharing_collaborator WHERE active = 1 ORDER BY label";
-$resql_collabs = $db->query($sql_collabs);
-if ($resql_collabs) {
-    while ($obj_collab = $db->fetch_object($resql_collabs)) {
-        $selected = ($obj_collab->rowid == $filter_collaborator) ? ' selected' : '';
-        print '<option value="'.$obj_collab->rowid.'"'.$selected.'>'.dol_escape_htmltag($obj_collab->label).'</option>';
-    }
-    $db->free($resql_collabs);
-}
-print '</select>';
-
-// Filtre année
-print '<strong>Année :</strong> ';
-print '<select name="year" onchange="this.form.submit()" style="font-size: 1em; padding: 5px;">';
-for ($y = date('Y'); $y >= date('Y') - 5; $y--) {
-    $selected = ($y == $year) ? ' selected' : '';
-    print '<option value="'.$y.'"'.$selected.'>'.$y.'</option>';
-}
-print '</select>';
-
-print '</form>';
-
-// Bouton pour vider le cache
-print ' <a href="'.$_SERVER["PHP_SELF"].'?year='.$year.'&clear_cache=1'.($filter_collaborator ? '&filter_collaborator='.$filter_collaborator : '').'" class="button" style="margin-left: 10px;" title="Vider le cache pour actualiser les statistiques immédiatement">';
-print '🔄 Actualiser les stats';
-print '</a>';
-
-print '</div>';
 
 // Titre section Prestations Studio
 print '<div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border-radius: 8px; padding: 15px; margin: 15px 0; color: white;">';
