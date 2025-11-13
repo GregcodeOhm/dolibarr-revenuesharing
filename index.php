@@ -86,11 +86,11 @@ $margeventesfocal_enabled = isModEnabled('margeventesfocal');
 $focal_stats = null;
 
 if ($margeventesfocal_enabled) {
-    // Requête pour récupérer les stats des ventes Focal
+    // Requête pour récupérer les stats des ventes Focal (même logique que focal_margin_contracts.php)
     $sql_focal = "SELECT
         COUNT(DISTINCT f.rowid) as nb_factures,
-        SUM(fd.total_ht) as ca_total_ht,
-        SUM(fd.qty * p.pmp) as cout_total_pmp,
+        SUM(fd.total_ht) as ventes_ht,
+        SUM(fd.qty * p.pmp) as couts_pmp,
         SUM(fd.total_ht - (fd.qty * p.pmp)) as marge_totale
     FROM ".MAIN_DB_PREFIX."facture f
     INNER JOIN ".MAIN_DB_PREFIX."facturedet fd ON f.rowid = fd.fk_facture
@@ -107,8 +107,8 @@ if ($margeventesfocal_enabled) {
         $sql_focal = "SELECT
             COUNT(DISTINCT c.rowid) as nb_factures,
             SUM(c.amount_ht) as marge_totale,
-            SUM(c.studio_amount_ht) as cout_total_pmp,
-            SUM(c.collaborator_amount_ht) as ca_total_ht
+            SUM(c.studio_amount_ht) as part_studio,
+            SUM(c.collaborator_amount_ht) as part_collaborateur
         FROM ".MAIN_DB_PREFIX."revenuesharing_contract c
         WHERE YEAR(c.date_creation) = ".(int)$year."
         AND c.fk_collaborator = ".(int)$filter_collaborator."
@@ -123,44 +123,93 @@ if ($margeventesfocal_enabled) {
 }
 
 // Section Statistiques Ventes Focal
-if ($margeventesfocal_enabled && $focal_stats && $focal_stats->ca_total_ht > 0) {
-    $taux_marge = $focal_stats->ca_total_ht > 0 ? round(($focal_stats->marge_totale / ($focal_stats->ca_total_ht + $focal_stats->cout_total_pmp)) * 100, 2) : 0;
+if ($margeventesfocal_enabled && $focal_stats && ($focal_stats->nb_factures > 0)) {
+    // Calculer les valeurs selon le mode (avec ou sans filtre collaborateur)
+    if ($filter_collaborator > 0) {
+        // Mode contrats : on affiche les parts du contrat
+        $ventes_ht = 0; // Non applicable pour les contrats
+        $couts_pmp = 0; // Non applicable
+        $marge_totale = $focal_stats->marge_totale;
+        $part_studio = $focal_stats->part_studio;
+        $part_collaborateur = $focal_stats->part_collaborateur;
+        $taux_marge = 0; // Non applicable
+        $studio_percentage = ($marge_totale > 0) ? round(($part_studio / $marge_totale) * 100, 2) : 40;
+        $collab_percentage = 100 - $studio_percentage;
+    } else {
+        // Mode global : on affiche les stats des ventes
+        $ventes_ht = $focal_stats->ventes_ht;
+        $couts_pmp = $focal_stats->couts_pmp;
+        $marge_totale = $focal_stats->marge_totale;
+        $taux_marge = $ventes_ht > 0 ? round(($marge_totale / $ventes_ht) * 100, 2) : 0;
+        // Répartition par défaut 40/60
+        $part_studio = $marge_totale * 0.40;
+        $part_collaborateur = $marge_totale * 0.60;
+        $studio_percentage = 40;
+        $collab_percentage = 60;
+    }
 
     print '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; padding: 20px; margin: 15px 0; color: white;">';
     print '<h4 style="margin: 0 0 15px 0; color: white; display: flex; align-items: center; gap: 10px;">';
-    print '<span style="font-size: 1.5em;">🎯</span>';
-    print 'Ventes Focal '.$year.($filter_collaborator > 0 ? ' - Contrats Marge Focal' : '');
+    print '<span style="font-size: 1.5em;">📊</span>';
+    print 'Résumé des marges Focal pour '.$year;
     print '</h4>';
 
-    print '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">';
+    print '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">';
 
     // Nombre de factures
     print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
-    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Factures Focal</div>';
+    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Factures avec produits Focal</div>';
     print '<div style="font-size: 2em; font-weight: bold;">'.$focal_stats->nb_factures.'</div>';
     print '</div>';
 
-    // CA Total
-    print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
-    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">'.($filter_collaborator > 0 ? 'Marge totale' : 'CA Ventes HT').'</div>';
-    print '<div style="font-size: 2em; font-weight: bold;">'.price($focal_stats->ca_total_ht + $focal_stats->cout_total_pmp).' €</div>';
-    print '</div>';
-
-    // Coût Total
-    print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
-    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">'.($filter_collaborator > 0 ? 'Part Studio' : 'Coût PMP').'</div>';
-    print '<div style="font-size: 2em; font-weight: bold;">'.price($focal_stats->cout_total_pmp).' €</div>';
-    print '</div>';
-
-    // Marge
-    print '<div style="background: rgba(255,255,255,0.3); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px); border: 2px solid rgba(255,255,255,0.5);">';
-    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">'.($filter_collaborator > 0 ? 'Part Collaborateur' : 'Marge brute').'</div>';
-    print '<div style="font-size: 2em; font-weight: bold;">'.price($focal_stats->marge_totale).' €</div>';
+    // Total ventes HT (si mode global)
     if (!$filter_collaborator) {
-        print '<div style="font-size: 0.9em; opacity: 0.8; margin-top: 5px;">'.$taux_marge.'% de marge</div>';
+        print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
+        print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Total ventes HT</div>';
+        print '<div style="font-size: 2em; font-weight: bold;">'.price($ventes_ht).' €</div>';
+        print '</div>';
+
+        // Total coûts PMP
+        print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
+        print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Total coûts (PMP)</div>';
+        print '<div style="font-size: 2em; font-weight: bold;">'.price($couts_pmp).' €</div>';
+        print '</div>';
     }
+
+    // Marge totale
+    print '<div style="background: rgba(255,255,255,0.3); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px); border: 2px solid rgba(255,255,255,0.5);">';
+    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Marge totale</div>';
+    print '<div style="font-size: 2em; font-weight: bold;">'.price($marge_totale).' €</div>';
     print '</div>';
 
+    // Taux de marge (si mode global)
+    if (!$filter_collaborator) {
+        print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
+        print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Taux de marge moyen</div>';
+        print '<div style="font-size: 2em; font-weight: bold;">'.$taux_marge.' %</div>';
+        print '</div>';
+    }
+
+    print '</div>';
+
+    // Répartition Ohmnibus / Collaborateur
+    print '<div style="background: rgba(255,255,255,0.15); padding: 15px; border-radius: 6px; margin-top: 15px;">';
+    print '<h5 style="margin: 0 0 15px 0; color: white;">💰 Répartition avec '.$studio_percentage.'% Ohmnibus / '.$collab_percentage.'% Collaborateur</h5>';
+    print '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">';
+
+    // Part Ohmnibus
+    print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
+    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Part Ohmnibus ('.$studio_percentage.'%)</div>';
+    print '<div style="font-size: 1.8em; font-weight: bold;">'.price($part_studio).' €</div>';
+    print '</div>';
+
+    // Part Collaborateur
+    print '<div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 6px; backdrop-filter: blur(10px);">';
+    print '<div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 5px;">Part Collaborateur ('.$collab_percentage.'%)</div>';
+    print '<div style="font-size: 1.8em; font-weight: bold;">'.price($part_collaborateur).' €</div>';
+    print '</div>';
+
+    print '</div>';
     print '</div>';
 
     print '<div style="margin-top: 15px; text-align: center;">';
