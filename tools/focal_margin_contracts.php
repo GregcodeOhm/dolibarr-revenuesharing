@@ -72,7 +72,7 @@ if ($action == 'create_contract' && $facture_id > 0 && $collaborator_id > 0) {
 
         $sql_contract = "INSERT INTO ".MAIN_DB_PREFIX."revenuesharing_contract (
             ref, label, fk_collaborator, fk_facture,
-            amount_ht, studio_amount_ht, collaborator_amount_ht, net_collaborator_amount,
+            amount_ht, collaborator_percentage, studio_amount_ht, collaborator_amount_ht, net_collaborator_amount,
             date_creation, fk_user_creat, status,
             note_private
         ) VALUES (
@@ -81,13 +81,14 @@ if ($action == 'create_contract' && $facture_id > 0 && $collaborator_id > 0) {
             ".(int)$collaborator_id.",
             ".(int)$facture_id.",
             ".$marge.",
+            ".$collab_percentage.",
             ".$studio_amount.",
             ".$collab_amount.",
             ".$collab_amount.",
             NOW(),
             ".(int)$user->id.",
             0,
-            'Contrat créé automatiquement depuis marge Focal\\nFacture: ".$db->escape($fac->ref)."\\nVente HT: ".price($fac->vente_ht)."\\nCoût PMP: ".price($fac->cout_pmp)."\\nMarge: ".price($marge)."\\nRépartition: ".$studio_percentage."% Ohmnibus / ".$collab_percentage."% Collaborateur'
+            'Contrat créé automatiquement depuis marge Focal\\nFacture: ".$db->escape($fac->ref)."\\nVente HT: ".price($fac->vente_ht)." €\\nCoût PMP: ".price($fac->cout_pmp)." €\\nMarge: ".price($marge)." €\\nRépartition: ".$studio_percentage."% Ohmnibus / ".$collab_percentage."% Collaborateur\\nPart Studio: ".price($studio_amount)." €\\nPart Collaborateur: ".price($collab_amount)." €'
         )";
 
         $resql_contract = $db->query($sql_contract);
