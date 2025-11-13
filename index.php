@@ -423,7 +423,8 @@ print '<th class="center">Part Studio</th>';
 print '<th class="center">Progression</th>';
 print '</tr>';
 
-$previous_year_ca = 0;
+// D'abord collecter toutes les données pour pouvoir calculer les progressions correctement
+$years_data = array();
 for ($y = date('Y'); $y >= date('Y') - 4; $y--) {
     $sql_year = "SELECT COUNT(CASE WHEN status >= 1 THEN 1 END) as nb_valid,";
     $sql_year .= " COALESCE(SUM(CASE WHEN status >= 1 THEN amount_ht ELSE 0 END), 0) as total_ht,";
@@ -437,15 +438,36 @@ for ($y = date('Y'); $y >= date('Y') - 4; $y--) {
     $resql_year = $db->query($sql_year);
     if ($resql_year) {
         $obj_year = $db->fetch_object($resql_year);
-        $year_total_ht = $obj_year->total_ht ? $obj_year->total_ht : 0;
-        $year_total_collab = $obj_year->total_collaborator ? $obj_year->total_collaborator : 0;
-        $year_total_studio = $year_total_ht - $year_total_collab;
+        $years_data[$y] = array(
+            'nb_valid' => $obj_year->nb_valid,
+            'total_ht' => $obj_year->total_ht ? $obj_year->total_ht : 0,
+            'total_collaborator' => $obj_year->total_collaborator ? $obj_year->total_collaborator : 0
+        );
+        $db->free($resql_year);
+    } else {
+        $years_data[$y] = null;
+    }
+}
 
-        // Calculer la progression par rapport à l'année N+1 (année suivante dans la boucle qui descend)
-        $progression_text = '-';
-        $progression_color = '';
-        if ($previous_year_ca > 0 && $year_total_ht > 0) {
-            $progression_pct = round((($year_total_ht - $previous_year_ca) / $previous_year_ca) * 100, 1);
+// Afficher les lignes avec progression calculée par rapport à l'année précédente (N-1)
+for ($y = date('Y'); $y >= date('Y') - 4; $y--) {
+    if ($years_data[$y] === null) {
+        print '<tr class="oddeven"><td class="center">'.$y.'</td><td colspan="5" class="center">Erreur</td></tr>';
+        continue;
+    }
+
+    $year_total_ht = $years_data[$y]['total_ht'];
+    $year_total_collab = $years_data[$y]['total_collaborator'];
+    $year_total_studio = $year_total_ht - $year_total_collab;
+
+    // Calculer la progression par rapport à l'année précédente (N-1)
+    $progression_text = '-';
+    $progression_color = '';
+    $previous_year = $y - 1;
+    if (isset($years_data[$previous_year]) && $years_data[$previous_year] !== null) {
+        $previous_year_ht = $years_data[$previous_year]['total_ht'];
+        if ($previous_year_ht > 0) {
+            $progression_pct = round((($year_total_ht - $previous_year_ht) / $previous_year_ht) * 100, 1);
             if ($progression_pct > 0) {
                 $progression_text = '+'.number_format($progression_pct, 1, ',', ' ').'%';
                 $progression_color = ' style="color: #28a745; font-weight: bold;"';
@@ -457,25 +479,18 @@ for ($y = date('Y'); $y >= date('Y') - 4; $y--) {
                 $progression_color = ' style="color: #6c757d;"';
             }
         }
-
-        $row_style = ($y == $year) ? ' style="background-color: #e3f2fd; font-weight: bold;"' : '';
-
-        print '<tr class="oddeven"'.$row_style.'>';
-        print '<td class="center">'.$y.($y == $year ? ' (actuelle)' : '').'</td>';
-        print '<td class="center">'.$obj_year->nb_valid.'</td>';
-        print '<td class="center">'.price($year_total_ht).'</td>';
-        print '<td class="center">'.price($year_total_collab).'</td>';
-        print '<td class="center">'.price($year_total_studio).'</td>';
-        print '<td class="center"'.$progression_color.'>'.$progression_text.'</td>';
-        print '</tr>';
-
-        // Stocker le CA de cette année pour la prochaine itération
-        $previous_year_ca = $year_total_ht;
-
-        $db->free($resql_year);
-    } else {
-        print '<tr class="oddeven"><td class="center">'.$y.'</td><td colspan="5" class="center">Erreur</td></tr>';
     }
+
+    $row_style = ($y == $year) ? ' style="background-color: #e3f2fd; font-weight: bold;"' : '';
+
+    print '<tr class="oddeven"'.$row_style.'>';
+    print '<td class="center">'.$y.($y == $year ? ' (actuelle)' : '').'</td>';
+    print '<td class="center">'.$years_data[$y]['nb_valid'].'</td>';
+    print '<td class="center">'.price($year_total_ht).'</td>';
+    print '<td class="center">'.price($year_total_collab).'</td>';
+    print '<td class="center">'.price($year_total_studio).'</td>';
+    print '<td class="center"'.$progression_color.'>'.$progression_text.'</td>';
+    print '</tr>';
 }
 
 print '</table>';
