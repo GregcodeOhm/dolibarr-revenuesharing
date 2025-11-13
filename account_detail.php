@@ -285,7 +285,74 @@ if ($ca_info->ca_total_ht > 0 || $ca_info->ca_previsionnel_ht > 0) {
         
         print '</div>';
     }
-    
+
+    // Section Détail Studio / Focal
+    if (isset($ca_info->ca_studio_ht) && isset($ca_info->ca_focal_ht) && ($ca_info->ca_studio_ht > 0 || $ca_info->ca_focal_ht > 0)) {
+        print '<div style="background: white; border-radius: 6px; padding: 12px; margin-top: 15px;">';
+        print '<h5 style="margin: 0 0 15px 0; color: #6c85bd;">📊 Détail Prestations Studio / Ventes Focal</h5>';
+
+        print '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">';
+
+        // Bloc Prestations Studio
+        print '<div style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); padding: 15px; border-radius: 6px; border-left: 4px solid #28a745;">';
+        print '<h6 style="margin: 0 0 10px 0; color: #155724; display: flex; align-items: center; gap: 5px;"><span>🎬</span> Prestations Studio</h6>';
+
+        print '<div style="background: rgba(255,255,255,0.8); padding: 8px; border-radius: 4px; margin-bottom: 8px;">';
+        print '<div style="font-size: 0.8em; color: #666; margin-bottom: 3px;">CA Total</div>';
+        print '<div style="font-size: 1.2em; font-weight: bold; color: #155724;">'.price($ca_info->ca_studio_ht).'</div>';
+        print '</div>';
+
+        print '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">';
+        print '<div style="background: rgba(255,255,255,0.8); padding: 6px; border-radius: 4px;">';
+        print '<div style="font-size: 0.7em; color: #666;">Collaborateur</div>';
+        print '<div style="font-size: 1em; font-weight: bold; color: #007cba;">'.price($ca_info->collaborator_studio_ht).'</div>';
+        print '</div>';
+        print '<div style="background: rgba(255,255,255,0.8); padding: 6px; border-radius: 4px;">';
+        print '<div style="font-size: 0.7em; color: #666;">Studio</div>';
+        print '<div style="font-size: 1em; font-weight: bold; color: #f57c00;">'.price($ca_info->studio_studio_ht).'</div>';
+        print '</div>';
+        print '</div>';
+
+        if ($ca_info->nb_contrats_studio > 0) {
+            print '<div style="margin-top: 8px; font-size: 0.8em; color: #155724; text-align: center;">';
+            print $ca_info->nb_contrats_studio.' contrat(s)';
+            print '</div>';
+        }
+
+        print '</div>';
+
+        // Bloc Ventes Focal
+        print '<div style="background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%); padding: 15px; border-radius: 6px; border-left: 4px solid #6c85bd;">';
+        print '<h6 style="margin: 0 0 10px 0; color: #3f51b5; display: flex; align-items: center; gap: 5px;"><span>🎯</span> Ventes Focal</h6>';
+
+        print '<div style="background: rgba(255,255,255,0.8); padding: 8px; border-radius: 4px; margin-bottom: 8px;">';
+        print '<div style="font-size: 0.8em; color: #666; margin-bottom: 3px;">Marge Total</div>';
+        print '<div style="font-size: 1.2em; font-weight: bold; color: #3f51b5;">'.price($ca_info->ca_focal_ht).'</div>';
+        print '</div>';
+
+        print '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">';
+        print '<div style="background: rgba(255,255,255,0.8); padding: 6px; border-radius: 4px;">';
+        print '<div style="font-size: 0.7em; color: #666;">Collaborateur</div>';
+        print '<div style="font-size: 1em; font-weight: bold; color: #007cba;">'.price($ca_info->collaborator_focal_ht).'</div>';
+        print '</div>';
+        print '<div style="background: rgba(255,255,255,0.8); padding: 6px; border-radius: 4px;">';
+        print '<div style="font-size: 0.7em; color: #666;">Ohmnibus</div>';
+        print '<div style="font-size: 1em; font-weight: bold; color: #f57c00;">'.price($ca_info->studio_focal_ht).'</div>';
+        print '</div>';
+        print '</div>';
+
+        if ($ca_info->nb_contrats_focal > 0) {
+            print '<div style="margin-top: 8px; font-size: 0.8em; color: #3f51b5; text-align: center;">';
+            print $ca_info->nb_contrats_focal.' contrat(s) MF';
+            print '</div>';
+        }
+
+        print '</div>';
+
+        print '</div>';
+        print '</div>';
+    }
+
     // Info complémentaire
     print '<div style="text-align: center; margin-top: 15px; font-size: 0.9em; color: var(--colortextbackhmenu); background: #f8f9fa; padding: 10px; border-radius: 4px;">';
     print '<span style="margin-right: 15px;">'.$ca_info->nb_contrats_total.' contrat(s) total</span>';

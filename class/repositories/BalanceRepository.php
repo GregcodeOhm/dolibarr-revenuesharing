@@ -197,6 +197,20 @@ class BalanceRepository
             COALESCE(SUM(CASE WHEN c.type_contrat = 'previsionnel' THEN c.studio_amount_ht ELSE 0 END), 0) as studio_previsionnel_ht,
             COALESCE(SUM(c.studio_amount_ht), 0) as studio_total_ht,
 
+            -- Distinction Studio / Focal (ref MF*)
+            COALESCE(SUM(CASE WHEN c.type_contrat != 'previsionnel' AND c.ref LIKE 'MF%' THEN c.amount_ht ELSE 0 END), 0) as ca_focal_ht,
+            COALESCE(SUM(CASE WHEN c.type_contrat != 'previsionnel' AND c.ref NOT LIKE 'MF%' THEN f.total_ht ELSE 0 END), 0) as ca_studio_ht,
+            COUNT(DISTINCT CASE WHEN c.ref LIKE 'MF%' THEN c.rowid END) as nb_contrats_focal,
+            COUNT(DISTINCT CASE WHEN c.ref NOT LIKE 'MF%' THEN c.rowid END) as nb_contrats_studio,
+
+            -- Parts collaborateur Studio/Focal
+            COALESCE(SUM(CASE WHEN c.ref LIKE 'MF%' THEN c.collaborator_amount_ht ELSE 0 END), 0) as collaborator_focal_ht,
+            COALESCE(SUM(CASE WHEN c.ref NOT LIKE 'MF%' THEN c.collaborator_amount_ht ELSE 0 END), 0) as collaborator_studio_ht,
+
+            -- Parts studio Studio/Focal
+            COALESCE(SUM(CASE WHEN c.ref LIKE 'MF%' THEN c.studio_amount_ht ELSE 0 END), 0) as studio_focal_ht,
+            COALESCE(SUM(CASE WHEN c.ref NOT LIKE 'MF%' THEN c.studio_amount_ht ELSE 0 END), 0) as studio_studio_ht,
+
             -- Pourcentages moyens
             AVG(c.collaborator_percentage) as avg_percentage,
 
