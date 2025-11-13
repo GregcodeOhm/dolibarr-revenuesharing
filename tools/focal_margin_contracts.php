@@ -23,9 +23,91 @@ $year = GETPOST('year', 'int') ? GETPOST('year', 'int') : date('Y');
 $action = GETPOST('action', 'alpha');
 $collaborator_id = GETPOST('collaborator_id', 'int');
 $studio_percentage = GETPOST('studio_percentage', 'int') ? GETPOST('studio_percentage', 'int') : 40;
+$facture_id = GETPOST('facture_id', 'int');
 
 // Initialize repositories
 $collaboratorRepo = new CollaboratorRepository($db);
+
+// ACTIONS
+if ($action == 'create_contract' && $facture_id > 0 && $collaborator_id > 0) {
+    $db->begin();
+
+    try {
+        // Récupérer les infos de la facture et calculer la marge
+        $sql_facture = "SELECT
+            f.rowid, f.ref, f.datef, f.fk_soc, f.total_ht,
+            s.nom as client_name,
+            SUM(fd.total_ht) as vente_ht,
+            SUM(fd.qty * p.pmp) as cout_pmp
+        FROM ".MAIN_DB_PREFIX."facture f
+        INNER JOIN ".MAIN_DB_PREFIX."facturedet fd ON f.rowid = fd.fk_facture
+        INNER JOIN ".MAIN_DB_PREFIX."product p ON fd.fk_product = p.rowid
+        INNER JOIN ".MAIN_DB_PREFIX."societe s ON f.fk_soc = s.rowid
+        LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields pe ON p.rowid = pe.fk_object
+        WHERE f.rowid = ".(int)$facture_id."
+        AND p.fk_product_type = 0
+        AND (pe.focal_is_focal = 1 OR p.ref LIKE '%focal%' OR p.ref LIKE '%JMlab%')
+        GROUP BY f.rowid";
+
+        $resql_fac = $db->query($sql_facture);
+        if (!$resql_fac || $db->num_rows($resql_fac) == 0) {
+            throw new Exception('Facture non trouvée ou sans produits Focal');
+        }
+
+        $fac = $db->fetch_object($resql_fac);
+        $marge = $fac->vente_ht - $fac->cout_pmp;
+        $collab_percentage = 100 - $studio_percentage;
+        $collab_amount = $marge * ($collab_percentage / 100);
+        $studio_amount = $marge * ($studio_percentage / 100);
+
+        $db->free($resql_fac);
+
+        if ($marge <= 0) {
+            throw new Exception('La marge est nulle ou négative');
+        }
+
+        // Créer le contrat
+        $contract_ref = 'MF'.date('Y').'-'.sprintf('%04d', $facture_id);
+        $contract_label = 'Marge Focal - '.$fac->ref.' - '.$fac->client_name;
+
+        $sql_contract = "INSERT INTO ".MAIN_DB_PREFIX."revenuesharing_contract (
+            ref, label, fk_collaborator, fk_facture,
+            amount_ht, studio_amount_ht, collaborator_amount_ht, net_collaborator_amount,
+            date_creation, fk_user_creat, status,
+            note_private
+        ) VALUES (
+            '".$db->escape($contract_ref)."',
+            '".$db->escape($contract_label)."',
+            ".(int)$collaborator_id.",
+            ".(int)$facture_id.",
+            ".$marge.",
+            ".$studio_amount.",
+            ".$collab_amount.",
+            ".$collab_amount.",
+            NOW(),
+            ".(int)$user->id.",
+            0,
+            'Contrat créé automatiquement depuis marge Focal\\nFacture: ".$db->escape($fac->ref)."\\nVente HT: ".price($fac->vente_ht)."\\nCoût PMP: ".price($fac->cout_pmp)."\\nMarge: ".price($marge)."\\nRépartition: ".$studio_percentage."% Ohmnibus / ".$collab_percentage."% Collaborateur'
+        )";
+
+        $resql_contract = $db->query($sql_contract);
+        if (!$resql_contract) {
+            throw new Exception('Erreur lors de la création du contrat: '.$db->lasterror());
+        }
+
+        $contract_id = $db->last_insert_id(MAIN_DB_PREFIX."revenuesharing_contract");
+
+        $db->commit();
+
+        setEventMessages('Contrat '.$contract_ref.' créé avec succès ! Montant collaborateur: '.price($collab_amount).' €', null, 'mesgs');
+        header('Location: '.$_SERVER['PHP_SELF'].'?year='.$year.'&collaborator_id='.$collaborator_id.'&studio_percentage='.$studio_percentage);
+        exit;
+
+    } catch (Exception $e) {
+        $db->rollback();
+        setEventMessages('Erreur: '.$e->getMessage(), null, 'errors');
+    }
+}
 
 llxHeader('', 'Contrats Marge Focal', '');
 
@@ -315,7 +397,23 @@ if (count($margins) > 0) {
         print '<td class="right">'.price($studio_facture).' €</td>';
         print '<td class="right"><strong>'.price($collab_facture).' €</strong></td>';
         print '<td class="center">';
-        print '<a href="#" class="button smallbutton" title="Créer un contrat Revenue Sharing">Créer contrat</a>';
+
+        // Vérifier si un contrat existe déjà pour cette facture
+        $sql_exist = "SELECT rowid FROM ".MAIN_DB_PREFIX."revenuesharing_contract WHERE fk_facture = ".(int)$margin['facture_id'];
+        $resql_exist = $db->query($sql_exist);
+        $has_contract = ($resql_exist && $db->num_rows($resql_exist) > 0);
+
+        if ($has_contract) {
+            $contract_existing = $db->fetch_object($resql_exist);
+            print '<a href="'.dol_buildpath('/revenuesharing/contract_card_complete.php?id='.$contract_existing->rowid, 1).'" class="button smallbutton" style="background: #28a745;" title="Voir le contrat existant">✓ Contrat créé</a>';
+        } elseif ($collaborator_id > 0) {
+            print '<a href="'.$_SERVER['PHP_SELF'].'?action=create_contract&facture_id='.$margin['facture_id'].'&collaborator_id='.$collaborator_id.'&studio_percentage='.$studio_percentage.'&year='.$year.'&token='.newToken().'" class="button smallbutton" title="Créer un contrat Revenue Sharing">Créer contrat</a>';
+        } else {
+            print '<span style="color: #999; font-size: 0.9em;">Sélectionnez un collaborateur</span>';
+        }
+
+        if ($resql_exist) $db->free($resql_exist);
+
         print '</td>';
         print '</tr>';
     }
@@ -342,14 +440,24 @@ if (count($margins) > 0) {
 }
 
 // Message explicatif
-print '<div class="margin-section" style="background: #fff3cd;">';
-print '<h4 style="margin: 0 0 10px 0;">💡 Prochaines étapes (en développement)</h4>';
+print '<div class="margin-section" style="background: #e3f2fd;">';
+print '<h4 style="margin: 0 0 10px 0;">ℹ️ Comment utiliser cet outil</h4>';
 print '<ul>';
-print '<li>Le bouton "Créer contrat" créera automatiquement un contrat Revenue Sharing</li>';
-print '<li>Type de contrat : <strong>margin_sharing</strong> (pour différencier des contrats classiques)</li>';
-print '<li>Le contrat sera lié à la facture source</li>';
-print '<li>La description contiendra : "Marge Focal - [Ref Facture] - [Client]"</li>';
-print '<li>Le montant du contrat sera la part collaborateur calculée</li>';
+print '<li><strong>Étape 1</strong> : Sélectionnez un collaborateur dans le filtre ci-dessus</li>';
+print '<li><strong>Étape 2</strong> : Ajustez le pourcentage Studio/Collaborateur si nécessaire (défaut: 40%/60%)</li>';
+print '<li><strong>Étape 3</strong> : Cliquez sur "Créer contrat" pour chaque facture</li>';
+print '<li>Le contrat sera créé en statut <strong>brouillon</strong></li>';
+print '<li>La référence sera : <strong>MF{ANNÉE}-{ID_FACTURE}</strong> (ex: MF2025-0123)</li>';
+print '<li>Le contrat contiendra :</li>';
+print '<ul>';
+print '<li>Montant HT = Marge totale</li>';
+print '<li>Part Ohmnibus = Marge × '.$studio_percentage.'%</li>';
+print '<li>Part Collaborateur = Marge × '.$collab_percentage.'%</li>';
+print '<li>Lien vers la facture source</li>';
+print '<li>Note privée avec détails du calcul</li>';
+print '</ul>';
+print '<li>Une fois validé, le contrat créera automatiquement une transaction sur le compte collaborateur</li>';
+print '<li>Les contrats déjà créés sont marqués avec un ✓ vert</li>';
 print '</ul>';
 print '</div>';
 
