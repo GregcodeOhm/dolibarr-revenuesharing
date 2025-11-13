@@ -149,10 +149,11 @@ if ($margeventesfocal_enabled && $focal_stats && ($focal_stats->nb_factures > 0)
     }
 
     print '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; padding: 20px; margin: 15px 0; color: white;">';
-    print '<h4 style="margin: 0 0 15px 0; color: white; display: flex; align-items: center; gap: 10px;">';
-    print '<span style="font-size: 1.5em;">📊</span>';
-    print 'Résumé des marges Focal pour '.$year;
-    print '</h4>';
+    print '<h3 style="margin: 0 0 15px 0; color: white; display: flex; align-items: center; gap: 10px;">';
+    print '<span style="font-size: 1.3em;">🎯</span>';
+    print '<span>Ventes Focal '.$year.'</span>';
+    print '</h3>';
+    print '<h4 style="margin: 10px 0 15px 0; color: white; font-size: 1em; opacity: 0.9;">📊 Résumé des marges Focal</h4>';
 
     print '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">';
 
@@ -311,6 +312,14 @@ print ' <a href="'.$_SERVER["PHP_SELF"].'?year='.$year.'&clear_cache=1'.($filter
 print '🔄 Actualiser les stats';
 print '</a>';
 
+print '</div>';
+
+// Titre section Prestations Studio
+print '<div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border-radius: 8px; padding: 15px; margin: 15px 0; color: white;">';
+print '<h3 style="margin: 0; color: white; display: flex; align-items: center; gap: 10px;">';
+print '<span style="font-size: 1.3em;">🎬</span>';
+print '<span>Prestations Studio '.$year.'</span>';
+print '</h3>';
 print '</div>';
 
 // Boxes statistiques principales
